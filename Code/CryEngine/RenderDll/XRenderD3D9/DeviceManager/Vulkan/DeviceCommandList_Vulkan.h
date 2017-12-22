@@ -124,6 +124,7 @@ protected:
 	void EndRenderPassImpl(const CDeviceRenderPass& renderPass);
 	void SetViewportsImpl(uint32 vpCount, const D3DViewPort* pViewports);
 	void SetScissorRectsImpl(uint32 rcCount, const D3DRectangle* pRects);
+	void SetDepthBoundsImpl(float fMin, float fMax);
 	void SetPipelineStateImpl(const CDeviceGraphicsPSO* pDevicePSO);
 	void SetResourceLayoutImpl(const CDeviceResourceLayout* pResourceLayout);
 	void SetResourcesImpl(uint32 bindSlot, const CDeviceResourceSet* pResources);

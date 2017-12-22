@@ -1388,6 +1388,7 @@ public:
 
 	byte      m_bDeviceSupportsInstancing;
 
+	uint32    m_bDeviceSupports_AMDExt;
 	uint32    m_bDeviceSupports_NVDBT          : 1;
 	uint32    m_bDeviceSupportsTessellation    : 1;
 	uint32    m_bDeviceSupportsGeometryShaders : 1;

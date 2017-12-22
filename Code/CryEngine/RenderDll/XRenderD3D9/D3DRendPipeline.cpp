@@ -1052,7 +1052,7 @@ void CD3D9Renderer::FX_MSAASampleFreqStencilSetup(const uint32 nMSAAFlags, const
 		bScissorState     = EF_GetScissorState(sX, sY, sWdt, sHgt);
 		bDepthBoundsState = GetDepthBoundTestState(fDepthBoundsMin, fDepthBoundsMax);
 		EF_Scissor(false, sX, sY, sWdt, sHgt);
-		SetDepthBoundTest(fDepthBoundsMin, fDepthBoundsMax, false);
+		SetDepthBounds(fDepthBoundsMin, fDepthBoundsMax, false);
 		D3DSetCull(eCULL_Back);
 	}
 
@@ -1112,7 +1112,7 @@ void CD3D9Renderer::FX_MSAASampleFreqStencilSetup(const uint32 nMSAAFlags, const
 	if (nMSAAFlags & (MSAA_SAMPLEFREQ_MASK_CLEAR_STENCIL | MSAA_STENCILMASK_SET | MSAA_STENCILMASK_RESET_BIT | MSAA_SAMPLEFREQ_MASK_SET))
 	{
 		EF_Scissor(bScissorState, sX, sY, sWdt, sHgt);
-		SetDepthBoundTest(fDepthBoundsMin, fDepthBoundsMax, bDepthBoundsState);
+		SetDepthBounds(fDepthBoundsMin, fDepthBoundsMax, bDepthBoundsState);
 		D3DSetCull(nPrevCull);
 	}
 }

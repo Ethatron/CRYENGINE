@@ -545,6 +545,35 @@ void CDeviceGraphicsCommandInterfaceImpl::SetScissorRectsImpl(uint32 rcCount, co
 	rd->GetDeviceContext().RSSetScissorRects(rcCount, pRects);
 }
 
+#if USE_NV_API
+#include NV_API_HEADER
+#endif
+#if USE_AMD_API
+#include AMD_API_HEADER
+#endif
+
+void CDeviceGraphicsCommandInterfaceImpl::SetDepthBoundsImpl(float fMin, float fMax)
+{
+	CD3D9Renderer* const __restrict rd = gcpRendD3D;
+
+#if USE_NV_API
+	if (rd->m_bDeviceSupports_NVDBT)
+	{
+		NvAPI_Status status = NvAPI_D3D11_SetDepthBoundsTest(gcpRendD3D->GetDevice().GetRealDevice(), (fMin != 0.0f) && (fMax != 1.0f), fMin, fMax);
+		CRY_ASSERT(status == NVAPI_OK);
+	}
+#endif
+
+#if USE_AMD_API
+	if (rd->m_bDeviceSupports_AMDExt & AGS_DX11_EXTENSION_DEPTH_BOUNDS_TEST)
+	{
+		extern AGSContext* g_pAGSContext;
+		AGSReturnCode status = agsDriverExtensionsDX11_SetDepthBounds(g_pAGSContext, (fMin != 0.0f) && (fMax != 1.0f), fMin, fMax);
+		CRY_ASSERT(status == AGS_SUCCESS);
+	}
+#endif
+}
+
 void CDeviceGraphicsCommandInterfaceImpl::SetPipelineStateImpl(const CDeviceGraphicsPSO* devicePSO)
 {
 	CD3D9Renderer* const __restrict rd = gcpRendD3D;

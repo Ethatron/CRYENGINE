@@ -15,6 +15,18 @@ if (OPTION_ENGINE OR OPTION_SANDBOX OR OPTION_SHADERCACHEGEN)
 		)
 endif()
 
+if (OPTION_ENGINE OR OPTION_SANDBOX OR OPTION_SHADERCACHEGEN)
+	if(EXISTS "${SDK_DIR}/AMD/AGS Lib-5.1")
+		set (BinaryFileList_Win64
+			"${SDK_DIR}/AMD/AGS Lib-5.1/lib/amd_ags_x64.dll"
+			)
+
+	    set (BinaryFileList_Win32
+			"${SDK_DIR}/AMD/AGS Lib-5.1/lib/amd_ags_x86.dll"
+			)
+	endif()
+endif()
+
 file(TO_CMAKE_PATH "${DURANGO_SDK}" DURANGO_SDK_CMAKE)
 set (BinaryFileList_Durango
 	"${DURANGO_SDK_CMAKE}/xdk/symbols/d3dcompiler_47.dll"

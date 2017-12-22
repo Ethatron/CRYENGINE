@@ -801,7 +801,7 @@ CDeviceGraphicsPSO::EInitResult CDeviceGraphicsPSO_Vulkan::Init(const CDeviceGra
 	depthStencilStateCreateInfo.depthTestEnable  = ((psoDesc.m_RenderState & GS_NODEPTHTEST) && !(psoDesc.m_RenderState & GS_DEPTHWRITE)) ? VK_FALSE : VK_TRUE;
 	depthStencilStateCreateInfo.depthWriteEnable = (psoDesc.m_RenderState & GS_DEPTHWRITE) ? VK_TRUE : VK_FALSE;
 	depthStencilStateCreateInfo.depthCompareOp = depthCompareOp;
-	depthStencilStateCreateInfo.depthBoundsTestEnable = VK_FALSE;
+	depthStencilStateCreateInfo.depthBoundsTestEnable = psoDesc.m_bDepthBoundsTest ? VK_FALSE : VK_TRUE;
 	depthStencilStateCreateInfo.stencilTestEnable = (psoDesc.m_RenderState & GS_STENCIL) ? VK_TRUE : VK_FALSE;
 
 	depthStencilStateCreateInfo.front.failOp = StencilOp[(psoDesc.m_StencilState & FSS_STENCFAIL_MASK) >> FSS_STENCFAIL_SHIFT];
@@ -919,16 +919,22 @@ CDeviceGraphicsPSO::EInitResult CDeviceGraphicsPSO_Vulkan::Init(const CDeviceGra
 	colorBlendStateCreateInfo.blendConstants[2] = 0.0f;
 	colorBlendStateCreateInfo.blendConstants[3] = 0.0f;
 
-	static const VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_STENCIL_REFERENCE, VK_DYNAMIC_STATE_DEPTH_BIAS };
-	static const unsigned int dynamicStateCount = sizeof(dynamicStates) / sizeof(dynamicStates[0]);
-	
-	const bool bDisableDynamicDepthBias = !psoDesc.m_bDynamicDepthBias;
+	VkDynamicState dynamicStates[8];
+	unsigned int dynamicStateCount = 0;
 
+	dynamicStates[dynamicStateCount++] = VK_DYNAMIC_STATE_VIEWPORT;
+	dynamicStates[dynamicStateCount++] = VK_DYNAMIC_STATE_SCISSOR;
+	dynamicStates[dynamicStateCount++] = VK_DYNAMIC_STATE_STENCIL_REFERENCE;
+	if (psoDesc.m_bDepthBoundsTest)
+		dynamicStates[dynamicStateCount++] = VK_DYNAMIC_STATE_DEPTH_BOUNDS;
+	if (psoDesc.m_bDynamicDepthBias)
+		dynamicStates[dynamicStateCount++] = VK_DYNAMIC_STATE_DEPTH_BIAS;
+	
 	VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {};
 	dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	dynamicStateCreateInfo.pNext = nullptr;
 	dynamicStateCreateInfo.flags = 0;
-	dynamicStateCreateInfo.dynamicStateCount = dynamicStateCount - bDisableDynamicDepthBias;
+	dynamicStateCreateInfo.dynamicStateCount = dynamicStateCount;
 	dynamicStateCreateInfo.pDynamicStates = dynamicStates;
 
 	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo = {};
@@ -1413,6 +1419,11 @@ void CDeviceGraphicsCommandInterfaceImpl::SetViewportsImpl(uint32 vpCount, const
 void CDeviceGraphicsCommandInterfaceImpl::SetScissorRectsImpl(uint32 rcCount, const D3DRectangle* pRects)
 {
 	vkCmdSetScissor(GetVKCommandList()->GetVkCommandList(), 0, rcCount, reinterpret_cast<const VkRect2D*>(pRects));
+}
+
+void CDeviceGraphicsCommandInterfaceImpl::SetDepthBoundsImpl(float fMin, float fMax)
+{
+	vkCmdSetDepthBounds(GetVKCommandList()->GetVkCommandList(), fMin, fMax);
 }
 
 void CDeviceGraphicsCommandInterfaceImpl::SetPipelineStateImpl(const CDeviceGraphicsPSO* pDevicePSO)

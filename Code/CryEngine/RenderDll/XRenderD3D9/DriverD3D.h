@@ -486,8 +486,8 @@ public:
 
 	void GetReprojectionMatrix(Matrix44A & matReproj, const Matrix44A & matView, const Matrix44A & matProj, const Matrix44A & matPrevView, const Matrix44A & matPrevProj, float fFarPlane) const;
 
-  void SetDepthBoundTest(float fMin, float fMax, bool bEnable);
-	bool GetDepthBoundTestState(float& fMin, float& fMax) const;
+	void SetDepthBounds(float fMin, float fMax, bool bEnable) { /* deprecated */ }
+	bool GetDepthBoundTestState(float& fMin, float& fMax) const { /* deprecated */ return false;}
 
   void CreateDeferredUnitBox(t_arrDeferredMeshIndBuff& indBuff, t_arrDeferredMeshVertBuff& vertBuff);
   const t_arrDeferredMeshIndBuff& GetDeferredUnitBoxIndexBuffer() const;
@@ -1596,15 +1596,6 @@ inline void CD3D9Renderer::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY topType
 		m_CurTopology = topType;
 		m_DevMan.BindTopology(m_CurTopology);
 	}
-}
-
-inline bool CD3D9Renderer::GetDepthBoundTestState(float& fMin, float& fMax) const
-{
-	if (!m_bDeviceSupports_NVDBT)
-		return false;
-	fMin = m_fDepthBoundsMin;
-	fMax = m_fDepthBoundsMax;
-	return m_bDepthBoundsEnabled;
 }
 
 inline bool CD3D9Renderer::FX_SetStreamFlags(SShaderPass* pPass)

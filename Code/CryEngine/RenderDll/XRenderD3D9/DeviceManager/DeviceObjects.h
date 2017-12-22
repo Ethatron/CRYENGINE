@@ -346,8 +346,9 @@ public:
 	ERenderPrimitiveType       m_PrimitiveType;
 	CDeviceResourceLayoutPtr   m_pResourceLayout;
 	CDeviceRenderPassPtr       m_pRenderPass;
-	bool                       m_bDepthClip;
 	bool                       m_bAllowTesselation;
+	bool                       m_bDepthClip;
+	bool                       m_bDepthBoundsTest;
 	bool                       m_bDynamicDepthBias; // When clear, SetDepthBias() may be ignored by the PSO. This may be faster on PS4 and VK. It has no effect on DX11 (always on) and DX12 (always off).
 };
 
@@ -609,6 +610,7 @@ public:
 
 	void SetViewports(uint32 vpCount, const D3DViewPort* pViewports);
 	void SetScissorRects(uint32 rcCount, const D3DRectangle* pRects);
+	void SetDepthBounds(float fMin, float fMax);
 	void SetPipelineState(const CDeviceGraphicsPSO* devicePSO);
 	void SetResourceLayout(const CDeviceResourceLayout* resourceLayout);
 	void SetResources(uint32 bindSlot, const CDeviceResourceSet* pResources);

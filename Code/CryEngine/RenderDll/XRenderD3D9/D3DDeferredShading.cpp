@@ -676,7 +676,7 @@ bool CDeferredShading::DeferredDecalPass(const SDeferredDecal& rDecal, uint32 in
 	bool bUseLightVolumes = true;
 
 	rd->EF_Scissor(false, 0, 0, 1, 1);
-	rd->SetDepthBoundTest(0.0f, 1.0f, false); // stencil pre-passes are rop bound, using depth bounds increases even more rop cost
+	rd->SetDepthBounds(0.0f, 1.0f, false); // stencil pre-passes are rop bound, using depth bounds increases even more rop cost
 
 	IMaterial* pDecalMaterial = rDecal.pMaterial;
 	if (pDecalMaterial == NULL)
@@ -1192,17 +1192,17 @@ void CDeferredShading::LightPass(const SRenderLight* const __restrict pDL, bool 
 		auto prevPersFlags = rd->m_RP.m_TI[m_nThreadID].m_PersFlags;
 		rd->m_RP.m_TI[m_nThreadID].m_PersFlags |= RBPF_MIRRORCULL;
 
-		rd->SetDepthBoundTest(0.0f, 1.0f, false); // stencil pre-passes are rop bound, using depth bounds increases even more rop cost
+		rd->SetDepthBounds(0.0f, 1.0f, false); // stencil pre-passes are rop bound, using depth bounds increases even more rop cost
 		rd->FX_StencilFrustumCull((pDL->m_Flags & DLF_CASTSHADOW_MAPS) ? -4 : -1, pDL, NULL, 0);
 
 		rd->m_RP.m_TI[m_nThreadID].m_PersFlags = prevPersFlags;
 	}
-	else if (rd->m_bDeviceSupports_NVDBT && CRenderer::CV_r_DeferredShadingDepthBoundsTest == 1)
-		rd->SetDepthBoundTest(pDepthBounds.x, pDepthBounds.z, true);
+	else if (CRenderer::CV_r_DeferredShadingDepthBoundsTest == 1)
+		rd->SetDepthBounds(pDepthBounds.x, pDepthBounds.z, true);
 
 	// todo: try out on consoles if DBT helps on light pass (on light stencil prepass is actually slower)
-	if (rd->m_bDeviceSupports_NVDBT && bStencilMask && CRenderer::CV_r_DeferredShadingDepthBoundsTest && CRenderer::CV_r_deferredshadingDBTstencil)
-		rd->SetDepthBoundTest(pDepthBounds.x, pDepthBounds.z, true);
+	if (bStencilMask && CRenderer::CV_r_DeferredShadingDepthBoundsTest && CRenderer::CV_r_deferredshadingDBTstencil)
+		rd->SetDepthBounds(pDepthBounds.x, pDepthBounds.z, true);
 
 	if (bStencilMask)
 	{
@@ -1389,7 +1389,7 @@ void CDeferredShading::LightPass(const SRenderLight* const __restrict pDL, bool 
 }
 #endif
 
-	rd->SetDepthBoundTest(0.0f, 1.0f, false);
+	rd->SetDepthBounds(0.0f, 1.0f, false);
 
 #ifdef SUPPORTS_MSAA
 	if (bMSAA)
@@ -1447,7 +1447,7 @@ bool CDeferredShading::AmbientPass(SRenderLight* pGlobalCubemap, bool& bOutdoorV
 
 	SpecularAccEnableMRT(false);
 	if (CRenderer::CV_r_DeferredShadingDepthBoundsTest)
-		rd->SetDepthBoundTest(0.0f, DBT_SKY_CULL_DEPTH, false); // Disable depth bounds for ambient lookup.
+		rd->SetDepthBounds(0.0f, DBT_SKY_CULL_DEPTH, false); // Disable depth bounds for ambient lookup.
 
 	const uint32 nNumClipVolumes = RenderView()->GetClipVolumes().size();
 	if (nNumClipVolumes)
@@ -1483,7 +1483,7 @@ bool CDeferredShading::AmbientPass(SRenderLight* pGlobalCubemap, bool& bOutdoorV
 
 	SpecularAccEnableMRT(true);
 	if (CRenderer::CV_r_DeferredShadingDepthBoundsTest)
-		rd->SetDepthBoundTest(0.0f, DBT_SKY_CULL_DEPTH, true); // Enable depth bounds - discard sky
+		rd->SetDepthBounds(0.0f, DBT_SKY_CULL_DEPTH, true); // Enable depth bounds - discard sky
 
 	Vec3 vE3DParam;
 	gEnv->p3DEngine->GetGlobalParameter(E3DPARAM_AMBIENT_GROUND_COLOR, vE3DParam);
@@ -1697,15 +1697,15 @@ void CDeferredShading::DeferredCubemapPass(const SRenderLight* const __restrict 
 	if (bStencilMask)
 	{
 		SpecularAccEnableMRT(false);
-		rd->SetDepthBoundTest(0.0f, 1.0f, false);
+		rd->SetDepthBounds(0.0f, 1.0f, false);
 		rd->FX_StencilFrustumCull(-1, pDL, NULL, 0);
 	}
 	else if (rd->m_bDeviceSupports_NVDBT && CRenderer::CV_r_DeferredShadingDepthBoundsTest == 1)
-		rd->SetDepthBoundTest(pDepthBounds.x, pDepthBounds.z, true);
+		rd->SetDepthBounds(pDepthBounds.x, pDepthBounds.z, true);
 
 	// todo: try out on consoles if DBT helps on light pass (on light stencil prepass is actually slower)
 	if (rd->m_bDeviceSupports_NVDBT && bStencilMask && CRenderer::CV_r_DeferredShadingDepthBoundsTest && CRenderer::CV_r_deferredshadingDBTstencil)
-		rd->SetDepthBoundTest(pDepthBounds.x, pDepthBounds.z, true);
+		rd->SetDepthBounds(pDepthBounds.x, pDepthBounds.z, true);
 
 	const float fFadeout = pDL->m_Color.a;  // fade-out intensity stored in alpha
 	const float fLuminance = pDL->m_Color.Luminance() * fFadeout;
@@ -1889,10 +1889,10 @@ void CDeferredShading::DeferredCubemapPass(const SRenderLight* const __restrict 
 		rd->FX_StencilTestCurRef(false);
 	}
 	else if (rd->m_bDeviceSupports_NVDBT && CRenderer::CV_r_DeferredShadingDepthBoundsTest == 1)
-		rd->SetDepthBoundTest(0.f, 1.f, false);
+		rd->SetDepthBounds(0.f, 1.f, false);
 
 	if (rd->m_bDeviceSupports_NVDBT && bStencilMask && CRenderer::CV_r_DeferredShadingDepthBoundsTest && CRenderer::CV_r_deferredshadingDBTstencil)
-		rd->SetDepthBoundTest(0.f, 1.f, false);
+		rd->SetDepthBounds(0.f, 1.f, false);
 
 	SpecularAccEnableMRT(true);
 
@@ -1925,7 +1925,7 @@ void CDeferredShading::DeferredShadingPass()
 	rd->m_RP.m_FlagsShader_RT &= ~(g_HWSR_MaskBit[HWSR_SAMPLE0] | g_HWSR_MaskBit[HWSR_SAMPLE1] | g_HWSR_MaskBit[HWSR_SAMPLE2] | g_HWSR_MaskBit[HWSR_SAMPLE4] | RT_CLIPVOLUME_ID);
 
 	if (CRenderer::CV_r_DeferredShadingDepthBoundsTest)
-		rd->SetDepthBoundTest(0.0f, DBT_SKY_CULL_DEPTH, true);
+		rd->SetDepthBounds(0.0f, DBT_SKY_CULL_DEPTH, true);
 
 	// Deferred subsurface scattering
 	bool deferredSSS = CRenderer::CV_r_DeferredShadingSSS && rd->FX_GetMSAAMode() == 0;  // Explicitly disabling deferred SSS has its incompatible with msaa in current stage
@@ -2047,7 +2047,7 @@ void CDeferredShading::DeferredShadingPass()
 	PROFILE_LABEL_POP("COMPOSITION");
 
 	if (CRenderer::CV_r_DeferredShadingDepthBoundsTest)
-		rd->SetDepthBoundTest(0.0f, DBT_SKY_CULL_DEPTH, false);
+		rd->SetDepthBounds(0.0f, DBT_SKY_CULL_DEPTH, false);
 
 	if (deferredSSS)
 	{
@@ -2181,7 +2181,7 @@ bool CDeferredShading::PackAllShadowFrustums(bool bPreLoop)
 		SetupPasses();
 		rd->FX_ResetPipe();
 		rd->EF_Scissor(false, 0, 0, 0, 0);
-		rd->SetDepthBoundTest(0.0f, 1.0f, false);
+		rd->SetDepthBounds(0.0f, 1.0f, false);
 
 		{
 
@@ -2558,7 +2558,7 @@ bool CDeferredShading::ShadowLightPasses(const SRenderLight& light, const int nL
 		if (CRenderer::CV_r_DeferredShadingDepthBoundsTest == 1 && !bAreaLight)
 		{
 			Vec4 pDepthBounds = GetLightDepthBounds(&light, (rd->m_RP.m_TI[m_nThreadID].m_PersFlags & RBPF_REVERSE_DEPTH) != 0);
-			rd->SetDepthBoundTest(pDepthBounds.x, pDepthBounds.z, true);
+			rd->SetDepthBounds(pDepthBounds.x, pDepthBounds.z, true);
 		}
 
 		if (nS == 0)
@@ -2574,7 +2574,7 @@ bool CDeferredShading::ShadowLightPasses(const SRenderLight& light, const int nL
 			//use current WorldProj matrix
 			rd->FX_StencilFrustumCull(-2, &light, &firstFrustum, nS);
 
-			rd->SetDepthBoundTest(0, 1, false);
+			rd->SetDepthBounds(0, 1, false);
 		}
 
 		rd->m_RP.m_TI[m_nThreadID].m_PersFlags = nPersFlagsPrev;
@@ -2848,7 +2848,7 @@ void CDeferredShading::Render(CRenderView* pRenderView)
 		rd->EF_Scissor(false, 0, 0, 0, 0);
 
 	if (CRenderer::CV_r_DeferredShadingDepthBoundsTest)
-		rd->SetDepthBoundTest(0.f, DBT_SKY_CULL_DEPTH, true); // skip sky for ambient and deferred cubemaps
+		rd->SetDepthBounds(0.f, DBT_SKY_CULL_DEPTH, true); // skip sky for ambient and deferred cubemaps
 
 	int iTempX, iTempY, iWidth, iHeight;
 	rd->GetViewport(&iTempX, &iTempY, &iWidth, &iHeight);
@@ -2932,7 +2932,7 @@ void CDeferredShading::Render(CRenderView* pRenderView)
 	SpecularAccEnableMRT(true);
 
 	if (CRenderer::CV_r_DeferredShadingDepthBoundsTest)
-		rd->SetDepthBoundTest(0.0f, 1.0f, false);
+		rd->SetDepthBounds(0.0f, 1.0f, false);
 
 	if (CRenderer::CV_r_DeferredShadingLights && !bTiledDeferredShading)
 		DeferredLights(rDeferredLights, true);
@@ -2941,7 +2941,7 @@ void CDeferredShading::Render(CRenderView* pRenderView)
 		rd->EF_Scissor(false, 0, 0, 0, 0);
 
 	if (CRenderer::CV_r_DeferredShadingDepthBoundsTest)
-		rd->SetDepthBoundTest(0.0f, 1.0f, false);
+		rd->SetDepthBounds(0.0f, 1.0f, false);
 
 	if (CRenderer::CV_r_Unlit)
 	{

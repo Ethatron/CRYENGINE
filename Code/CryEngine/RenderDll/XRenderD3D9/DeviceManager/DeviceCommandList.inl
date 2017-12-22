@@ -143,6 +143,11 @@ inline void CDeviceGraphicsCommandInterface::SetScissorRects(uint32 rcCount, con
 	SetScissorRectsImpl(rcCount, pRects);
 }
 
+inline void CDeviceGraphicsCommandInterface::SetDepthBounds(float fMin, float fMax)
+{
+	SetDepthBounds(fMin, fMax);
+}
+
 inline void CDeviceGraphicsCommandInterface::SetPipelineState(const CDeviceGraphicsPSO* pDevicePSO)
 {
 	if (m_graphicsState.pPipelineState.Set(pDevicePSO))

@@ -594,6 +594,7 @@ CDeviceGraphicsPSO::EInitResult CDeviceGraphicsPSO_DX12::Init(const CDeviceGraph
 	// depth stencil and rasterizer state
 	memcpy(&psoInitParams.m_Desc.DepthStencilState, &depthStencilDesc, sizeof(depthStencilDesc));
 	memcpy(&psoInitParams.m_Desc.RasterizerState, &rasterizerDesc, sizeof(rasterizerDesc));
+	psoInitParams.m_DepthBoundsTestEnable = psoDesc.m_bDepthBoundsTest;
 
 	auto extractShaderBytecode = [&](EHWShaderClass shaderClass)
 	{
@@ -1228,6 +1229,11 @@ void CDeviceGraphicsCommandInterfaceImpl::SetScissorRectsImpl(uint32 rcCount, co
 {
 	// D3D11_RECT := D3D12_RECT
 	GetDX12CommandList()->SetScissorRects(rcCount, (D3D12_RECT*)pRects);
+}
+
+void CDeviceGraphicsCommandInterfaceImpl::SetDepthBoundsImpl(float fMin, float fMax)
+{
+	GetDX12CommandList()->SetDepthBounds(fMin, fMax);
 }
 
 void CDeviceGraphicsCommandInterfaceImpl::SetPipelineStateImpl(const CDeviceGraphicsPSO* devicePSO)
