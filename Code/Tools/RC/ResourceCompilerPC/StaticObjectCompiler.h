@@ -30,6 +30,7 @@ private:
 
 	void AnalyzeSharedMeshes(CContentCGF* pCGF);
 	bool CompileMeshes(CContentCGF* pCGF, bool bIgnoreTangentspaceErrors);
+	bool OptimizeMeshes(CContentCGF* pCGF);
 
 	bool SplitLODs(CContentCGF* pCGF);
 	CContentCGF* MakeLOD(int nLodNum, const CContentCGF* pCGF);

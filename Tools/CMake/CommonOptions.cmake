@@ -20,7 +20,17 @@ if(OPTION_ENGINE)
 else()
 	option(OPTION_UQS_SCHEMATYC_SUPPORT "Enable UQS functions in Schematyc" OFF)
 endif()
-	
+
+if(WIN32)
+	if(${CMAKE_GENERATOR} MATCHES "Visual Studio")
+		if (EXISTS "${SDK_DIR}/AMD/Tootle-2.2.150" AND OPTION_ENGINE)
+			option(USE_TOOTLE "Enable Tootle face reordering in engine" ON)
+		else()
+			option(USE_TOOTLE "Enable Tootle face reordering in engine" OFF)
+		endif()
+	endif()
+endif()
+
 if(OPTION_UQS_SCHEMATYC_SUPPORT)
 	list(APPEND global_defines UQS_SCHEMATYC_SUPPORT=1)
 else()

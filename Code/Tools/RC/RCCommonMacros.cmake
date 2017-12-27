@@ -1,3 +1,33 @@
+macro(deploy_runtime_file source destination)
+	if(USE_CONFIG)
+		# HACK: This works on the assumption that any individual file is only used by *one* configuration, or *all* configurations. CMake will generate errors otherwise.
+		list(APPEND DEPLOY_FILES "$<$<CONFIG:${USE_CONFIG}>:${source}>")
+		list(APPEND DEPLOY_FILES "${source}")
+		list(APPEND DEPLOY_FILES "${destination}")
+	else()
+		list(APPEND DEPLOY_FILES "${source}")
+		list(APPEND DEPLOY_FILES "${source}")
+		list(APPEND DEPLOY_FILES "${destination}")
+	endif()
+	set(DEPLOY_FILES "${DEPLOY_FILES}" CACHE INTERNAL "List of files to deploy before running")
+endmacro()
+
+macro(deploy_runtime_files fileexpr)
+	file(GLOB FILES_TO_COPY "${fileexpr}")
+	foreach(FILE_PATH ${FILES_TO_COPY})
+		get_filename_component(FILE_NAME "${FILE_PATH}" NAME)
+
+		# If another argument was passed files are deployed to the subdirectory
+		if (${ARGC} GREATER 1)
+			deploy_runtime_file("${FILE_PATH}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${ARGV1}/${FILE_NAME}")
+			install(FILES "${FILE_PATH}" DESTINATION "Tools/rc/${ARGV1}")
+		else ()
+			deploy_runtime_file("${FILE_PATH}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${FILE_NAME}")
+			install(FILES "${FILE_PATH}" DESTINATION "Tools/rc")
+		endif ()
+	endforeach()
+endmacro()
+
 function(add_prefix list_name prefix)
 	set( ${list_name}_TMP )
 	foreach(s ${${list_name}})

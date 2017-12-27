@@ -1911,97 +1911,112 @@ bool CLoaderCGF::ProcessSkinning()
 		assert(newFaceCount == numIntFaces);
 	}
 
-	// Compile contents.
-	// These map from internal (original) to external (optimized) indices/vertices
-	std::vector<int> arrVRemapping;
-	std::vector<int> arrIRemapping;
+	//-----------------------------------------------------------------------------------------------
 
-	m_pCompiledCGF = MakeCompiledSkinCGF(m_pCGF, &arrVRemapping, &arrIRemapping);
-	if (!m_pCompiledCGF)
 	{
-		return false;
-	}
-	const uint32 numVRemapping = arrVRemapping.size();
-	if (numVRemapping == 0)
-	{
-		m_LastError = "Empty vertex remapping";
-		return false;
-	}
-	if (arrIRemapping.size() != numIntFaces * 3)
-	{
-		m_LastError.Format("Wrong # of indices for remapping");
-		return false;
-	}
+		// Compile contents.
+		// These map from internal (original) to external (optimized) indices/vertices
+		std::vector<vtx_idx> arrVRemapping;
+		std::vector<int>     arrIRemapping;
 
-	//allocates the external to internal map entries
-	// (m_arrExt2IntMap[]: for each final vertex contains its index in initial vertex buffer)
-	// TODO: in theory arrVRemapping.size() is not necessarily equals to the number of final vertices.
-	// It could be bigger if a face is not referenced from any of the subsets.
-	pSkinningInfo->m_arrExt2IntMap.resize(numVRemapping, ~0);
-	for (uint32 i = 0; i < numIntFaces; ++i)
-	{
-		const uint32 idx0 = arrVRemapping[arrIRemapping[i * 3 + 0]];
-		const uint32 idx1 = arrVRemapping[arrIRemapping[i * 3 + 1]];
-		const uint32 idx2 = arrVRemapping[arrIRemapping[i * 3 + 2]];
-		if (idx0 >= numVRemapping || idx1 >= numVRemapping || idx2 >= numVRemapping)
+		m_pVertexRemapping = &arrVRemapping;
+		m_pIndexRemapping  = &arrIRemapping;
+
+		// NOTE: This works, because there is only one mesh-node allowed in skin files!
+		m_pCompiledCGF = MakeCompiledSkinCGF(m_pCGF);
+		if (!m_pCompiledCGF)
 		{
-			m_LastError.Format("Indices out of range");
 			return false;
 		}
-		pSkinningInfo->m_arrExt2IntMap[idx0] = pSkinningInfo->m_arrIntFaces[i].i0;
-		pSkinningInfo->m_arrExt2IntMap[idx1] = pSkinningInfo->m_arrIntFaces[i].i1;
-		pSkinningInfo->m_arrExt2IntMap[idx2] = pSkinningInfo->m_arrIntFaces[i].i2;
-	}
 
-	{
-		int brokenCount = 0;
-		for (uint32 i = 0; i < numVRemapping; i++)
+		const uint32 numVRemapping = arrVRemapping.size();
+		if (numVRemapping == 0)
 		{
-			if (pSkinningInfo->m_arrExt2IntMap[i] >= numIntVertices)
+			m_LastError = "Empty vertex remapping";
+			return false;
+		}
+		if (arrIRemapping.size() != numIntFaces * 3)
+		{
+			m_LastError.Format("Wrong # of indices for remapping");
+			return false;
+		}
+
+		//allocates the external to internal map entries
+		// (m_arrExt2IntMap[]: for each final vertex contains its index in initial vertex buffer)
+		// TODO: in theory arrVRemapping.size() is not necessarily equals to the number of final vertices.
+		// It could be bigger if a face is not referenced from any of the subsets.
+		pSkinningInfo->m_arrExt2IntMap.resize(numVRemapping, ~0);
+		for (uint32 i = 0; i < numIntFaces; ++i)
+		{
+			const uint32 idx0 = arrVRemapping[arrIRemapping[i * 3 + 0]];
+			const uint32 idx1 = arrVRemapping[arrIRemapping[i * 3 + 1]];
+			const uint32 idx2 = arrVRemapping[arrIRemapping[i * 3 + 2]];
+			if (idx0 >= numVRemapping || idx1 >= numVRemapping || idx2 >= numVRemapping)
 			{
-				++brokenCount;
-				// "Fixing" mapping allows us to comment out "return false" below (in case of an urgent need)
-				pSkinningInfo->m_arrExt2IntMap[i] = 0;
+				m_LastError.Format("Indices out of range");
+				return false;
+			}
+			pSkinningInfo->m_arrExt2IntMap[idx0] = pSkinningInfo->m_arrIntFaces[i].i0;
+			pSkinningInfo->m_arrExt2IntMap[idx1] = pSkinningInfo->m_arrIntFaces[i].i1;
+			pSkinningInfo->m_arrExt2IntMap[idx2] = pSkinningInfo->m_arrIntFaces[i].i2;
+		}
+
+		{
+			int brokenCount = 0;
+			for (uint32 i = 0; i < numVRemapping; i++)
+			{
+				if (pSkinningInfo->m_arrExt2IntMap[i] >= numIntVertices)
+				{
+					++brokenCount;
+					// "Fixing" mapping allows us to comment out "return false" below (in case of an urgent need)
+					pSkinningInfo->m_arrExt2IntMap[i] = 0;
+				}
+			}
+			if (brokenCount > 0)
+			{
+				m_LastError.Format("Remapping-table is broken. %i of %i vertices are not remapped", brokenCount, numVRemapping);
+				return false;
 			}
 		}
-		if (brokenCount > 0)
-		{
-			m_LastError.Format("Remapping-table is broken. %i of %i vertices are not remapped", brokenCount, numVRemapping);
-			return false;
-		}
+
+		m_pVertexRemapping = nullptr;
+		m_pIndexRemapping  = nullptr;
 	}
 
 	//-------------------------------------------------------------------------
-
-	std::vector<SMeshSubset> arrSubsets;
-	std::vector<TFace> arrExtFaces;
-
-	if (!SplitIntoRBatches(arrSubsets, arrExtFaces, m_LastError, pMesh))
 	{
-		return false;
-	}
+		std::vector<SMeshSubset> arrSubsets;
+		std::vector<TFace> arrExtFaces;
 
-	//--------------------------------------------------------------------------
-	//---              copy compiled-data back into CMesh                    ---
-	//--------------------------------------------------------------------------
-	for (size_t f = 0, n = arrExtFaces.size(); f < n; ++f)
-	{
-		pMesh->m_pIndices[f * 3 + 0] = arrExtFaces[f].i0;
-		pMesh->m_pIndices[f * 3 + 1] = arrExtFaces[f].i1;
-		pMesh->m_pIndices[f * 3 + 2] = arrExtFaces[f].i2;
-	}
+		if (!SplitIntoRBatches(arrSubsets, arrExtFaces, m_LastError, pMesh))
+		{
+			return false;
+		}
 
-	pMesh->m_subsets.clear();
-	pMesh->m_subsets.reserve(arrSubsets.size());
-	for (size_t i = 0; i < arrSubsets.size(); ++i)
-	{
-		pMesh->m_subsets.push_back(arrSubsets[i]);
+		//--------------------------------------------------------------------------
+		//---              copy compiled-data back into CMesh                    ---
+		//--------------------------------------------------------------------------
+		for (size_t f = 0, n = arrExtFaces.size(); f < n; ++f)
+		{
+			pMesh->m_pIndices[f * 3 + 0] = arrExtFaces[f].i0;
+			pMesh->m_pIndices[f * 3 + 1] = arrExtFaces[f].i1;
+			pMesh->m_pIndices[f * 3 + 2] = arrExtFaces[f].i2;
+		}
+
+		pMesh->m_subsets.clear();
+		pMesh->m_subsets.reserve(arrSubsets.size());
+		for (size_t i = 0; i < arrSubsets.size(); ++i)
+		{
+			pMesh->m_subsets.push_back(arrSubsets[i]);
+		}
 	}
 
 	//////////////////////////////////////////////////////////////////////////
 	// Create and fill bone-mapping streams.
 	//////////////////////////////////////////////////////////////////////////
 	{
+		uint32 numVRemapping = pSkinningInfo->m_arrExt2IntMap.size();
+
 		pMesh->ReallocStream(CMesh::BONEMAPPING, numVRemapping);
 		if (bHasExtraBoneMappings)
 		{
@@ -2095,6 +2110,8 @@ bool CLoaderCGF::ProcessSkinning()
 	// Copy shape-deformation and positions.
 	//////////////////////////////////////////////////////////////////////////
 	{
+		uint32 numVRemapping = pSkinningInfo->m_arrExt2IntMap.size();
+
 		// Modify orientation, but keep translation.
 		// We need to keep translation to be able to use pivot of the node.
 		// It allows us to control coordinate origin for FP16 meshes.
@@ -2147,48 +2164,51 @@ bool CLoaderCGF::ProcessSkinning()
 	//--------------------------------------------------------------------------
 	//---              prepare morph-targets                                 ---
 	//--------------------------------------------------------------------------
-	uint32 numMorphTargets = pSkinningInfo->m_arrMorphTargets.size();
-	for (uint32 it = 0; it < numMorphTargets; ++it)
 	{
-		//init internal morph-targets
-		MorphTargets* pMorphtarget = pSkinningInfo->m_arrMorphTargets[it];
-		uint32 numMorphVerts = pMorphtarget->m_arrIntMorph.size();
-		uint32 intVertexCount = pSkinningInfo->m_arrIntVertices.size();
-		for (uint32 i = 0; i < numMorphVerts; i++)
+		const uint16* pExtToIntMap = &pSkinningInfo->m_arrExt2IntMap[0];
+		uint32 numVRemapping = pSkinningInfo->m_arrExt2IntMap.size();
+		uint32 numMorphTargets = pSkinningInfo->m_arrMorphTargets.size();
+		for (uint32 it = 0; it < numMorphTargets; ++it)
 		{
-			uint32 idx = pMorphtarget->m_arrIntMorph[i].nVertexId;
-			assert(idx < intVertexCount);
-			Vec3 mvertex = (mat34 * pMorphtarget->m_arrIntMorph[i].ptVertex) - pSkinningInfo->m_arrIntVertices[idx].pos;
-			pMorphtarget->m_arrIntMorph[i].ptVertex = mvertex;
-		}
-
-		//init external morph-targets
-		for (uint32 v = 0; v < numMorphVerts; v++)
-		{
-			uint32 idx = pMorphtarget->m_arrIntMorph[v].nVertexId;
-			Vec3 mvertex = pMorphtarget->m_arrIntMorph[v].ptVertex;
-
-			const uint16* pExtToIntMap = &pSkinningInfo->m_arrExt2IntMap[0];
-			uint32 numExtVertices = numVRemapping;
-			assert(numExtVertices);
-			for (uint32 i = 0; i < numExtVertices; ++i)
+			//init internal morph-targets
+			MorphTargets* pMorphtarget = pSkinningInfo->m_arrMorphTargets[it];
+			uint32 numMorphVerts = pMorphtarget->m_arrIntMorph.size();
+			uint32 intVertexCount = pSkinningInfo->m_arrIntVertices.size();
+			for (uint32 i = 0; i < numMorphVerts; i++)
 			{
-				uint32 index = pExtToIntMap[i];
-				if (index == idx)
+				uint32 idx = pMorphtarget->m_arrIntMorph[i].nVertexId;
+				assert(idx < intVertexCount);
+				Vec3 mvertex = (mat34 * pMorphtarget->m_arrIntMorph[i].ptVertex) - pSkinningInfo->m_arrIntVertices[idx].pos;
+				pMorphtarget->m_arrIntMorph[i].ptVertex = mvertex;
+			}
+
+			//init external morph-targets
+			for (uint32 v = 0; v < numMorphVerts; v++)
+			{
+				uint32 idx = pMorphtarget->m_arrIntMorph[v].nVertexId;
+				Vec3 mvertex = pMorphtarget->m_arrIntMorph[v].ptVertex;
+
+				uint32 numExtVertices = numVRemapping;
+				assert(numExtVertices);
+				for (uint32 i = 0; i < numExtVertices; ++i)
 				{
-					SMeshMorphTargetVertex mp;
-					mp.nVertexId = i;
-					mp.ptVertex = mvertex;
-					pMorphtarget->m_arrExtMorph.push_back(mp);
+					uint32 index = pExtToIntMap[i];
+					if (index == idx)
+					{
+						SMeshMorphTargetVertex mp;
+						mp.nVertexId = i;
+						mp.ptVertex = mvertex;
+						pMorphtarget->m_arrExtMorph.push_back(mp);
+					}
 				}
 			}
 		}
-	}
 
-	pMesh->m_bbox.Reset();
-	for (size_t v = 0; v < numVRemapping; ++v)
-	{
-		pMesh->m_bbox.Add(pMesh->m_pPositions[v]);
+		pMesh->m_bbox.Reset();
+		for (size_t v = 0; v < numVRemapping; ++v)
+		{
+			pMesh->m_bbox.Add(pMesh->m_pPositions[v]);
+		}
 	}
 
 	return true;
@@ -2202,8 +2222,7 @@ bool CLoaderCGF::ProcessSkinning()
 //////////////////////////////////////////////////////////////////////////
 #if defined(RESOURCE_COMPILER)
 
-CContentCGF* CLoaderCGF::MakeCompiledSkinCGF(
-  CContentCGF* pCGF, std::vector<int>* pVertexRemapping, std::vector<int>* pIndexRemapping) PREFAST_SUPPRESS_WARNING(6262) //function uses > 32k stack space
+CContentCGF* CLoaderCGF::MakeCompiledSkinCGF(CContentCGF* pCGF) PREFAST_SUPPRESS_WARNING(6262) //function uses > 32k stack space
 {
 	CContentCGF* const pCompiledCGF = new CContentCGF(pCGF->GetFilename());
 	*pCompiledCGF->GetExportInfo() = *pCGF->GetExportInfo(); // Copy export info.
@@ -2230,10 +2249,10 @@ CContentCGF* CLoaderCGF::MakeCompiledSkinCGF(
 
 		bMeshFound = true;
 
-		mesh_compiler::CMeshCompiler meshCompiler;
+		mesh_compiler::CMeshCompiler meshCompiler(0);
 
-		meshCompiler.SetIndexRemapping(pIndexRemapping);
-		meshCompiler.SetVertexRemapping(pVertexRemapping);
+		meshCompiler.SetIndexRemapping(m_pIndexRemapping);
+		meshCompiler.SetVertexRemapping(m_pVertexRemapping);
 
 		int flags = mesh_compiler::MESH_COMPILE_TANGENTS | mesh_compiler::MESH_COMPILE_OPTIMIZE;
 		if (pCompiledCGF->GetExportInfo()->bUseCustomNormals)
@@ -2262,7 +2281,7 @@ CContentCGF* CLoaderCGF::MakeCompiledSkinCGF(
 			if (pNodeCGF->pMesh && pNodeCGF->bPhysicsProxy)
 			{
 				// Compile physics proxy mesh.
-				mesh_compiler::CMeshCompiler meshCompiler;
+				mesh_compiler::CMeshCompiler meshCompiler(0);
 				if (!meshCompiler.Compile(*pNodeCGF->pMesh, mesh_compiler::MESH_COMPILE_OPTIMIZE))
 				{
 					m_LastError.Format("Failed to compile skinned geometry in node %s in file %s - %s", pNodeCGF->name, pCGF->GetFilename(), meshCompiler.GetLastError());
