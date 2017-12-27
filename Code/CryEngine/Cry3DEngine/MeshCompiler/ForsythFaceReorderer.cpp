@@ -3,10 +3,11 @@
 #include "StdAfx.h"
 
 #if CRY_PLATFORM_WINDOWS
+#if !USE_TOOTLE
 
-	#include "ForsythFaceReorderer.h"
+#include "ForsythFaceReorderer.h"
 
-	#include <cmath>    // powf()
+#include <cmath>    // powf()
 
 ForsythFaceReorderer::ForsythFaceReorderer()
 	: m_cacheSize(0)
@@ -341,6 +342,7 @@ uint32 ForsythFaceReorderer::findBestFaceToAdd(uint32& faceSearchCursor) const
 	return faceSearchCursor++;
 }
 
+#endif
 #endif
 
 // eof

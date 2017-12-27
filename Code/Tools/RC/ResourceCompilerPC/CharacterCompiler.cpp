@@ -45,6 +45,7 @@ CharacterCompiler::CharacterCompiler(ICryXML * pXml)
 {
 	m_pXML = pXml;
 	m_pPhysicsInterface = NULL;
+	m_logVerbosityLevel = 0;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -125,6 +126,7 @@ bool CharacterCompiler::Process()
 	}
 
 	bool ok = true;
+	m_logVerbosityLevel = m_CC.pRC->GetVerbosityLevel();
 
 	try
 	{
@@ -369,6 +371,72 @@ bool CharacterCompiler::ProcessInternal(CLoaderCGF* cgfLoader, CContentCGF* pCGF
 		chunkFile->Clear();
 	}
 
+	//-----------------------------------------------------------------------------------------------
+
+	const SFileVersion& fv = m_CC.pRC->GetFileVersion();
+	CContentCGF* pCContentCGF = cgfLoader->GetCContentCGF();
+
+	if (pCContentCGF == 0)
+	{
+		std::vector<vtx_idx> arrVRemapping;
+		std::vector<int>     arrIRemapping;
+
+		m_pVertexRemapping = &arrVRemapping;
+		m_pIndexRemapping  = &arrIRemapping;
+
+		// NOTE: This works, because there is only one mesh-node allowed in skin files!
+		pCContentCGF = MakeCompiledCGF(pCGF);
+		if (!pCContentCGF)
+		{
+			return false;
+		}
+
+		if (!pSkinningInfo->m_arrExt2IntMap.empty())
+		{
+			// remaps the external to internal map entries after sorting
+			auto& ext2IntMap = pSkinningInfo->m_arrExt2IntMap;
+			auto ext2IntMapCopy = ext2IntMap;
+
+			const uint32 numExt2Int    = ext2IntMap.size();
+			const uint32 numVRemapping = arrVRemapping.size();
+
+			if (numVRemapping != numExt2Int)
+			{
+				RCLogError("Ext2IntMap doesn't match number of vertices!");
+				return false;
+			}
+
+			for (uint32 i = 0; i < numExt2Int; ++i)
+			{
+				const vtx_idx oldVertexLocation = i;
+				const vtx_idx newVertexLocation = arrVRemapping[i];
+
+				ext2IntMap[newVertexLocation] = ext2IntMapCopy[oldVertexLocation];
+			}
+		}
+
+		for (uint32 i = 0; i < numMorphtargets; i++)
+		{
+			// remaps the external morph target indices
+			auto& extMorphs = pSkinningInfo->m_arrMorphTargets[i]->m_arrExtMorph;
+
+			const uint32 numExtMorphs = extMorphs.size();
+
+			for (uint32 i = 0; i < numExtMorphs; ++i)
+			{
+				const vtx_idx oldVertexLocation =               extMorphs[i].nVertexId ;
+				const vtx_idx newVertexLocation = arrVRemapping[extMorphs[i].nVertexId];
+
+				extMorphs[i].nVertexId = newVertexLocation;
+			}
+		}
+
+		m_pVertexRemapping = nullptr;
+		m_pIndexRemapping = nullptr;
+	}
+
+	//-----------------------------------------------------------------------------------------------
+
 	std::vector<IntMeshCollisionInfo> arrCollisions;
 	std::vector<CryBoneDescData_Comp> bones;
 	std::vector<BONE_ENTITY> physBones;
@@ -444,7 +512,6 @@ bool CharacterCompiler::ProcessInternal(CLoaderCGF* cgfLoader, CContentCGF* pCGF
 			header.numIntVertices = pSkinningInfo->m_arrMorphTargets[i]->m_arrIntMorph.size();
 			//store the vertices&indices of morph-target
 			header.numExtVertices = pSkinningInfo->m_arrMorphTargets[i]->m_arrExtMorph.size();
-
 
 			WriteData(morphTargetsChunkData, &header, 1, bNeedEndianSwap);
 
@@ -558,19 +625,6 @@ bool CharacterCompiler::ProcessInternal(CLoaderCGF* cgfLoader, CContentCGF* pCGF
 	}
 
 	//-----------------------------------------------------------------------------------------------
-
-	const SFileVersion& fv = m_CC.pRC->GetFileVersion();
-	CContentCGF* pCContentCGF = cgfLoader->GetCContentCGF();
-
-	if (pCContentCGF == 0)
-	{
-		pCContentCGF = MakeCompiledCGF(pCGF);
-		if (!pCContentCGF)
-		{
-			return false;
-		}
-	}
-
 
 	if (pCContentCGF)
 	{
@@ -779,30 +833,25 @@ void CharacterCompiler::DeleteOldChunks(CContentCGF *pCGF, CChunkFile &chunkFile
 //////////////////////////////////////////////////////////////////////////
 CContentCGF* CharacterCompiler::MakeCompiledCGF(CContentCGF *pCGF)
 {
+	if (pCGF->GetExportInfo()->bCompiledCGF)
+	{
+		const bool ok = ProcessCompiledCGF(pCGF);
+		if (!ok)
+		{
+			return 0;
+		}
+		return pCGF;
+	}
+
+	if (m_logVerbosityLevel > 2)
+	{
+		RCLog("Compiling SKIN");
+	}
+
 	CContentCGF *pCompiledCGF = new CContentCGF(pCGF->GetFilename());
 	*pCompiledCGF->GetExportInfo() = *pCGF->GetExportInfo(); // Copy export info.
 
 	{
-		// Compile meshes in nodes.
-		for (int i = 0, num = pCGF->GetNodeCount(); i < num; ++i)
-		{
-			CNodeCGF *pNodeCGF = pCGF->GetNode(i);
-			if (!pNodeCGF->pMesh || pNodeCGF->bPhysicsProxy)
-				continue;
-
-			mesh_compiler::CMeshCompiler meshCompiler;
-			const int compileFlags =
-				mesh_compiler::MESH_COMPILE_TANGENTS |
-				mesh_compiler::MESH_COMPILE_OPTIMIZE |
-				mesh_compiler::MESH_COMPILE_VALIDATE;
-			if (!meshCompiler.Compile(*pNodeCGF->pMesh, compileFlags))
-			{
-				RCLogError("Failed to compile geometry file %s - %s", pCGF->GetFilename(), meshCompiler.GetLastError());
-				delete pCompiledCGF;
-				return 0;
-			}
-		}
-
 		for (int i = 0, num = pCGF->GetNodeCount(); i < num; ++i)
 		{
 			CNodeCGF *pNodeCGF = pCGF->GetNode(i);
@@ -813,39 +862,151 @@ CContentCGF* CharacterCompiler::MakeCompiledCGF(CContentCGF *pCGF)
 		}
 	}
 
-	//////////////////////////////////////////////////////////////////////////
-	// Compile physics proxy nodes.
-	//////////////////////////////////////////////////////////////////////////
-	if (pCGF->GetExportInfo()->bHavePhysicsProxy)
+	// Compile meshes in all nodes.
 	{
-		for (int i = 0, num = pCGF->GetNodeCount(); i < num; ++i)
+		if (m_logVerbosityLevel > 2)
 		{
-			CNodeCGF *pNodeCGF = pCGF->GetNode(i);
-			if (pNodeCGF->pMesh && pNodeCGF->bPhysicsProxy)
-			{
-				// Compile physics proxy mesh.
-				mesh_compiler::CMeshCompiler meshCompiler;
-				if (!meshCompiler.Compile(*pNodeCGF->pMesh, mesh_compiler::MESH_COMPILE_OPTIMIZE))
-				{
-					RCLogError("Failed to compile geometry in node %s in file %s - %s", pNodeCGF->name, pCGF->GetFilename(), meshCompiler.GetLastError());
-					delete pCompiledCGF;
-					return 0;
-				}
-			}
-			pCompiledCGF->AddNode(pNodeCGF);
+			RCLog("Compiling meshes");
+		}
+		if (!CompileMeshes(pCompiledCGF))
+		{
+			return 0;
 		}
 	}
-	//////////////////////////////////////////////////////////////////////////
 
-	const bool ok = Physicalize(pCompiledCGF);
-	if (!ok)
 	{
-		RCLogError("Failed to physicalize geometry in file %s (bad vertex coordinates in source mesh, probably)", pCGF->GetFilename());
-		delete pCompiledCGF;
-		return 0;
+		//////////////////////////////////////////////////////////////////////////
+		// Compile physics proxy nodes.
+		//////////////////////////////////////////////////////////////////////////
+		if (pCGF->GetExportInfo()->bHavePhysicsProxy)
+		{
+			for (int i = 0, num = pCGF->GetNodeCount(); i < num; ++i)
+			{
+				CNodeCGF *pNodeCGF = pCGF->GetNode(i);
+				if (pNodeCGF->pMesh && pNodeCGF->bPhysicsProxy)
+				{
+					// Compile physics proxy mesh.
+					mesh_compiler::CMeshCompiler meshCompiler(0);
+					if (!meshCompiler.Compile(*pNodeCGF->pMesh, mesh_compiler::MESH_COMPILE_OPTIMIZE))
+					{
+						RCLogError("Failed to compile geometry in node %s in file %s - %s", pNodeCGF->name, pCGF->GetFilename(), meshCompiler.GetLastError());
+						delete pCompiledCGF;
+						return 0;
+					}
+				}
+				pCompiledCGF->AddNode(pNodeCGF);
+			}
+		}
+		//////////////////////////////////////////////////////////////////////////
+	}
+
+	{
+		if (m_logVerbosityLevel > 2)
+		{
+			RCLog("Physicalizing");
+		}
+		const bool ok = Physicalize(pCompiledCGF);
+		if (!ok)
+		{
+			RCLogError("Failed to physicalize geometry in file %s (bad vertex coordinates in source mesh, probably)", pCGF->GetFilename());
+			delete pCompiledCGF;
+			return 0;
+		}
 	}
 
 	return pCompiledCGF;
+}
+
+//////////////////////////////////////////////////////////////////////////
+bool CharacterCompiler::ProcessCompiledCGF(CContentCGF* pCGF)
+{
+	assert(pCGF->GetExportInfo()->bCompiledCGF);
+
+	// CGF is already compiled, so we just need to perform some validation and re-compiling steps.
+
+	// Optimize meshes in all nodes.
+	{
+		if (m_logVerbosityLevel > 2)
+		{
+			RCLog("Optimizing meshes");
+		}
+		if (!OptimizeMeshes(pCGF))
+		{
+			return 0;
+		}
+	}
+
+	return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+bool CharacterCompiler::CompileMeshes(CContentCGF *pCGF)
+{
+	// Compile Meshes in all nodes.
+	for (int i = 0, n = pCGF->GetNodeCount(); i < n; i++)
+	{
+		CNodeCGF *pNodeCGF = pCGF->GetNode(i);
+
+		if (auto pMesh = pNodeCGF->pMesh)
+		{
+			if (m_logVerbosityLevel > 2)
+			{
+				RCLog("Compiling geometry in node '%s'", pNodeCGF->name);
+			}
+
+			mesh_compiler::CMeshCompiler meshCompiler(m_logVerbosityLevel);
+
+			meshCompiler.SetIndexRemapping(m_pIndexRemapping);
+			meshCompiler.SetVertexRemapping(m_pVertexRemapping);
+
+			int nMeshCompileFlags = mesh_compiler::MESH_COMPILE_TANGENTS | mesh_compiler::MESH_COMPILE_VALIDATE;
+			if (pCGF->GetExportInfo()->bUseCustomNormals)
+			{
+				nMeshCompileFlags |= mesh_compiler::MESH_COMPILE_USE_CUSTOM_NORMALS;
+			}
+			if (!pNodeCGF->bPhysicsProxy)
+			{
+				nMeshCompileFlags |= mesh_compiler::MESH_COMPILE_OPTIMIZE;
+			}
+
+			if (!meshCompiler.Compile(*pMesh, nMeshCompileFlags))
+			{
+				RCLogError("Failed to compile geometry in node '%s' in file %s - %s", pNodeCGF->name, pCGF->GetFilename(), meshCompiler.GetLastError());
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+bool CharacterCompiler::OptimizeMeshes(CContentCGF *pCGF)
+{
+	// Optimize Meshes in all nodes.
+	for (int i = 0, n = pCGF->GetNodeCount(); i < n; i++)
+	{
+		CNodeCGF *pNodeCGF = pCGF->GetNode(i);
+
+		if (auto pMesh = pNodeCGF->pMesh)
+		{
+			if (m_logVerbosityLevel > 2)
+			{
+				RCLog("Optimizing geometry in node '%s'", pNodeCGF->name);
+			}
+
+			mesh_compiler::CMeshCompiler meshCompiler(m_logVerbosityLevel);
+
+			meshCompiler.SetIndexRemapping(m_pIndexRemapping);
+			meshCompiler.SetVertexRemapping(m_pVertexRemapping);
+
+			if (!meshCompiler.Optimize(*pMesh))
+			{
+				RCLogError("Failed to optimize geometry in node '%s' in file %s - %s", pNodeCGF->name, pCGF->GetFilename(), meshCompiler.GetLastError());
+				return false;
+			}
+		}
+	}
+	return true;
 }
 
 //////////////////////////////////////////////////////////////////////////

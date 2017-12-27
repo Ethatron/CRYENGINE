@@ -86,7 +86,7 @@ private:
 	// loading of skinned meshes
 	//////////////////////////////////////////////////////////////////////////
 	bool         ProcessSkinning();
-	CContentCGF* MakeCompiledSkinCGF(CContentCGF* pCGF, std::vector<int>* pVertexRemapping, std::vector<int>* pIndexRemapping);
+	CContentCGF* MakeCompiledSkinCGF(CContentCGF* pCGF);
 
 	//old chunks
 	bool   ReadBoneNameList(IChunkFile::ChunkDesc* pChunkDesc);
@@ -129,6 +129,9 @@ private:
 #if defined(RESOURCE_COMPILER)
 	std::vector<MeshUtils::VertexLinks> m_arrLinksTmp;
 	std::vector<int>                    m_vertexOldToNew; // used to re-map uncompiled Morph Target vertices right after reading them
+
+	std::vector<vtx_idx>*               m_pVertexRemapping = nullptr;
+	std::vector<int>*                   m_pIndexRemapping  = nullptr;
 #endif
 
 	CContentCGF* m_pCompiledCGF;

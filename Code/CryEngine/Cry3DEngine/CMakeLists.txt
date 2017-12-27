@@ -107,7 +107,7 @@ add_sources("Cry3DEngine_main_2_uber.cpp"
 	SOURCE_GROUP "Brush"
 		"Brush.cpp"
 		"Brush.h"
-	SOURCE_GROUP "CFG"
+	SOURCE_GROUP "CGF"
 		"CGF/CGFLoader.cpp"
 		"CGF/CGFSaver.cpp"
 		"CGF/ChunkFile.cpp"
@@ -133,9 +133,11 @@ add_sources("Cry3DEngine_main_2_uber.cpp"
 		"DistanceCloudRenderNode.h"
 	SOURCE_GROUP "Mesh Compiler"
 		"MeshCompiler/ForsythFaceReorderer.cpp"
+		"MeshCompiler/TootleFaceReorderer.cpp"
 		"MeshCompiler/MeshCompiler.cpp"
 		"MeshCompiler/TangentSpaceCalculation.cpp"
 		"MeshCompiler/ForsythFaceReorderer.h"
+		"MeshCompiler/TootleFaceReorderer.h"
 		"MeshCompiler/MeshCompiler.h"
 		"MeshCompiler/TangentSpaceCalculation.h"
 		"MeshCompiler/TransformHelpers.h"
@@ -391,3 +393,5 @@ end_sources()
 
 CryEngineModule(Cry3DEngine PCH "StdAfx.cpp" SOLUTION_FOLDER "CryEngine")
 target_link_libraries( ${THIS_PROJECT} PRIVATE lz4 )
+
+include("${TOOLS_CMAKE_DIR}/modules/Tootle-enable.cmake")

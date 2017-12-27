@@ -33,15 +33,16 @@ enum EMeshCompileFlags
 class CMeshCompiler
 {
 public:
-	CMeshCompiler();
+	CMeshCompiler(int logVerbosityLevel = 0);
 	~CMeshCompiler();
 
 #if CRY_PLATFORM_WINDOWS
 	// for flags see EMeshCompilerFlags
 	bool Compile(CMesh& mesh, int flags);
+	bool Optimize(CMesh& mesh);
 #endif
 
-	void SetVertexRemapping(std::vector<int>* pVertexMap)
+	void SetVertexRemapping(std::vector<vtx_idx>* pVertexMap)
 	{
 		m_pVertexMap = pVertexMap;
 	}
@@ -189,7 +190,6 @@ public:
 private:
 #if CRY_PLATFORM_WINDOWS
 	bool        CreateIndicesAndDeleteDuplicateVertices(CMesh& mesh);
-	bool        StripifyMesh_Forsyth(CMesh& mesh);
 	static bool CheckForDegenerateFaces(const CMesh& mesh);
 	static void FindVertexRanges(CMesh& mesh);
 #endif
@@ -202,9 +202,10 @@ private:
 	std::vector<const SMeshFace*> m_vhash_table[MAX_SUB_MATERIALS];
 	std::vector<SBasisFace>       m_thash_table[MAX_SUB_MATERIALS];
 
-	std::vector<int>*             m_pVertexMap;
+	std::vector<vtx_idx>*         m_pVertexMap;
 	std::vector<int>*             m_pIndexMap;
-
+	
+	int                           m_logVerbosityLevel;
 	string                        m_LastError;
 };
 

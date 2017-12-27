@@ -22,6 +22,7 @@ set(BUILD_CPU_ARCHITECTURE x64)
 set(BUILD_PLATFORM Win64)
 set(WIN64 1)
 
+set(TOOLS_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../Tools/CMake")
 set(CRYENGINE_SOURCE_DIR "${CMAKE_SOURCE_DIR}/../../..") 
 set(OUTPUT_DIRECTORY "${CRYENGINE_SOURCE_DIR}/Tools/rc")
 
@@ -58,6 +59,16 @@ if(OPTION_ASTC)
 	add_definitions(/DTOOLS_SUPPORT_ASTC)
 endif() 
 
+if(WIN32)
+	if(${CMAKE_GENERATOR} MATCHES "Visual Studio")
+		if (EXISTS "${SDK_DIR}/AMD/Tootle-2.2.150")
+			option(USE_TOOTLE "Enable Tootle face reordering in engine" ON)
+		else()
+			option(USE_TOOTLE "Enable Tootle face reordering in engine" OFF)
+		endif()
+	endif()
+endif()
+
 if (EXISTS "${SDK_DIR}/FbxSdk")
 	option(OPTION_FBX_SDK "FBX SDK support" ON)
 endif()
@@ -88,6 +99,10 @@ endif()
 
 if (EXISTS "${CMAKE_SOURCE_DIR}/PS4.cmake")
 	include("${CMAKE_SOURCE_DIR}/PS4.cmake")
+endif()
+
+if (USE_TOOTLE)
+		include("${TOOLS_CMAKE_DIR}/modules/Tootle.cmake")
 endif()
 
 include_directories( "${SDK_DIR}" )

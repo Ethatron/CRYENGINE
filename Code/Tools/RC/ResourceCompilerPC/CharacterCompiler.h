@@ -86,7 +86,13 @@ private:
 	bool ProcessInternal(CLoaderCGF * cgfLoader, CContentCGF * pCGF, CChunkFile * chunkFile, bool cdfasset, const string& sourceFile, const string& outputFile);
 	string GetOutputFileNameOnly() const;
 	string GetOutputPath() const;
-	void DeleteOldChunks( CContentCGF *pCGF,CChunkFile &chunkFile );
+	void DeleteOldChunks(CContentCGF *pCGF, CChunkFile &chunkFile);
+
+	bool ProcessCompiledCGF(CContentCGF* pCGF);
+
+	bool CompileMeshes(CContentCGF *pCGF);
+	bool OptimizeMeshes(CContentCGF* pCGF);
+
 	// Physicalize all meshes in cgf.
 	bool Physicalize( CContentCGF *pCGF );
 
@@ -123,8 +129,12 @@ private:
 	void ProcessVCloth(SVClothInfoCGF* pVClothInfo, std::vector<Vec3> const& vtx, std::vector<int> const& idx, std::vector<bool> const& attached);
 
 private:
-	CPhysicsInterface* m_pPhysicsInterface;
-	ICryXML* m_pXML;
+	CPhysicsInterface*    m_pPhysicsInterface;
+	ICryXML*              m_pXML;
+	int                   m_logVerbosityLevel;
+
+	std::vector<vtx_idx>* m_pVertexRemapping = nullptr;
+	std::vector<int>*     m_pIndexRemapping  = nullptr;
 };
 
 #endif

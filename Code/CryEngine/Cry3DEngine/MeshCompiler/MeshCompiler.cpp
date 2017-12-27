@@ -14,8 +14,19 @@
 #include "StdAfx.h"
 #include "MeshCompiler.h"
 #include "TangentSpaceCalculation.h"
+
+#if RESOURCE_COMPILER
+#include "MathHelpers.h"
+#else
+#include <CryThreading/IThreadManager.h> 
+#endif
+
 #if CRY_PLATFORM_WINDOWS
+#if USE_TOOTLE
+	#include "TootleFaceReorderer.h"
+#else
 	#include "ForsythFaceReorderer.h"
+#endif
 #endif
 
 #include <cstring>    // memset()
@@ -24,8 +35,9 @@ namespace mesh_compiler
 {
 
 //////////////////////////////////////////////////////////////////////////
-CMeshCompiler::CMeshCompiler()
-	: m_pVertexMap(0)
+CMeshCompiler::CMeshCompiler(int logVerbosityLevel)
+	: m_logVerbosityLevel(logVerbosityLevel)
+	, m_pVertexMap(0)
 	, m_pIndexMap(0)
 {
 }
@@ -843,10 +855,10 @@ bool CMeshCompiler::Compile(CMesh& mesh, int flags)
 
 	if (flags & MESH_COMPILE_OPTIMIZE)
 	{
-		const bool bOk = StripifyMesh_Forsyth(outMesh);
+		const bool bOk = Optimize(outMesh);
 		if (!bOk)
 		{
-			m_LastError.Format("Mesh compilation failed - stripifier failed. Contact an RC programmer.");
+			m_LastError.Format("Mesh compilation failed - optimizer failed. Contact an RC programmer.");
 			return false;
 		}
 	}
@@ -890,188 +902,371 @@ bool CMeshCompiler::Compile(CMesh& mesh, int flags)
 	return true;
 }
 
-bool CMeshCompiler::StripifyMesh_Forsyth(CMesh& mesh)
+bool CMeshCompiler::Optimize(CMesh& curMesh)
 {
-	if (mesh.GetFaceCount() > 0)
+	if (curMesh.GetFaceCount() > 0)
 	{
 		// We don't support stripifying of meshes with explicit faces, we support meshes with index array only
 		return false;
 	}
 
-	enum { kCACHESIZE_GEFORCE3 = 24 };
-	const size_t cacheSize = kCACHESIZE_GEFORCE3;
+	if (curMesh.GetIndexCount() == 0 || curMesh.GetVertexCount() == 0)
+	{
+		// Nothing to do
+		return true;
+	}
+
 	enum { kVerticesPerFace = 3 };
+	
+	const auto nSubsets = curMesh.GetSubSetCount();
+	const auto pIndices = curMesh.m_pIndices;
 
 	// Prepare mapping buffers
 	if (m_pIndexMap)
 	{
-		const int n = mesh.GetIndexCount();
-		m_pIndexMap->resize(n);
-		for (int i = 0; i < n; ++i)
+		m_pIndexMap->resize(curMesh.GetIndexCount());
+		for (size_t i = 0, n = m_pIndexMap->size(); i < n; ++i)
 		{
-			(*m_pIndexMap)[i] = mesh.m_pIndices[i];
+			(*m_pIndexMap)[i] = pIndices[i];
 		}
 	}
+
 	if (m_pVertexMap)
 	{
-		const int n = mesh.GetVertexCount();
-		m_pVertexMap->resize(n, -1);
+		m_pVertexMap->resize(curMesh.GetVertexCount());
+		for (size_t i = 0, n = m_pVertexMap->size(); i < n; ++i)
+		{
+			(*m_pVertexMap)[i] = -1;
+		}
+	}
+	
+	std::vector<std::pair<int    , int    >> idxBlobs(nSubsets, std::make_pair(-1, -1));
+	std::vector<std::pair<vtx_idx, vtx_idx>> vtxBlobs(nSubsets, std::make_pair(-1, -1));
+	int     idxMax = 0;
+	vtx_idx vtxMax = 0;
+
+	for (int i = 0, n = nSubsets; i < n; ++i)
+	{
+		const SMeshSubset& subset = curMesh.m_subsets[i];
+
+		if (subset.nNumIndices == 0)
+		{
+			continue;
+		}
+		if (subset.nNumIndices < 0)
+		{
+			assert(0);
+			return false;
+		}
+		if (subset.nNumIndices % kVerticesPerFace != 0)
+		{
+			assert(0);
+			return false;
+		}
+		if (subset.nFirstIndexId % kVerticesPerFace != 0)
+		{
+			assert(0);
+			return false;
+		}
+
+		vtx_idx nFirstVertexId = pIndices[subset.nFirstIndexId];
+		vtx_idx nLastVertexId  = pIndices[subset.nFirstIndexId + subset.nNumIndices - 1];
+		for (int j = subset.nFirstIndexId + 1, n = subset.nFirstIndexId + subset.nNumIndices; j < n; ++j)
+		{
+			nFirstVertexId = std::min(pIndices[j], nFirstVertexId);
+			nLastVertexId  = std::max(pIndices[j], nLastVertexId);
+		}
+		
+		idxMax = std::max(idxMax, subset.nNumIndices);
+		vtxMax = std::max(vtxMax, nLastVertexId + 1 - nFirstVertexId);
+
+		idxBlobs[i] = std::make_pair(subset.nFirstIndexId, subset.nFirstIndexId + subset.nNumIndices);
+		vtxBlobs[i] = std::make_pair(nFirstVertexId, nLastVertexId + 1);
+
+		if (m_logVerbosityLevel > 2)
+		{
+#if RESOURCE_COMPILER
+			RCLog(" subset %3d, material %3d: %8d indices [%8d to %8d), %8d vertices [%8d to %8d)", i, subset.nMatID,
+				subset.nNumIndices, subset.nFirstIndexId, subset.nFirstIndexId + subset.nNumIndices,
+				nLastVertexId + 1 - nFirstVertexId, nFirstVertexId, nLastVertexId + 1);
+#endif
+		}
 	}
 
-	CMesh newMesh;
-	newMesh.CopyFrom(mesh);
-
-	// TODO: make those variables members of CMeshCompiler so we don't need to allocate memory every time
-	ForsythFaceReorderer ffr;
-	std::vector<uint32> buffer0;
-	std::vector<uint32> buffer1;
-
-	// Reserve space
-	//
-	// We will use buffer0 for both subset's indices and for mapping from old vertex indices
-	// to new vertex indices (number of vertices decreases in case some vertices are not
-	// referenced from indices). In the latter case having size of buffer0 equal to number of
-	// indices is not enough if indices refer vertices in a spare fashion. Unfortunately,
-	// to compute range of referenced vertices we need to scan all indices in all subsets
-	// which is not fast.
+	// Vertices from one sub-mesh are not allowed to be used in another sub-mesh
+	// See: CGFLoader.cpp::ProcessSkinningHelpers::SplitIntoRBatches
+	// and IIndexedMesh.h::CMesh::Validate ("a mesh subset refers a vertex lying before subset vertices")
+#ifndef _RELEASE
+	auto lambdaSanityCheck = [&]() -> bool
 	{
-		int maxIndexCountInSubset = 0;
-		int maxVertexCountInSubset = 0;
-
-		for (int i = 0; i < newMesh.GetSubSetCount(); i++)
+		// Do the sanity check O(n*(n-1)):
+		for (int i = 0, n = nSubsets; i < n; ++i)
 		{
-			const SMeshSubset& subset = mesh.m_subsets[i];
-
-			if (subset.nNumIndices == 0)
+			// Skipped subset
+			if ((idxBlobs[i].first  == -1) &&
+			    (idxBlobs[i].second == -1))
 			{
 				continue;
 			}
-			if (subset.nNumIndices < 0)
-			{
-				assert(0);
-				return false;
-			}
-			if (subset.nNumIndices % kVerticesPerFace != 0)
-			{
-				assert(0);
-				return false;
-			}
-			if (subset.nFirstIndexId % kVerticesPerFace != 0)
-			{
-				assert(0);
-				return false;
-			}
 
-			if (maxIndexCountInSubset < subset.nNumIndices)
-			{
-				maxIndexCountInSubset = subset.nNumIndices;
-			}
+			const int nFirstIndexId1 = idxBlobs[i].first;
+			const int nLastIndexId1  = idxBlobs[i].second - 1;
 
-			int subsetMinIndex = mesh.m_pIndices[subset.nFirstIndexId];
-			int subsetMaxIndex = subsetMinIndex;
-			for (int j = 1; j < subset.nNumIndices; ++j)
-			{
-				const int idx = mesh.m_pIndices[subset.nFirstIndexId + j];
-				if (idx < subsetMinIndex)
-				{
-					subsetMinIndex = idx;
-				}
-				else if (idx > subsetMaxIndex)
-				{
-					subsetMaxIndex = idx;
-				}
-			}
+			const vtx_idx nFirstVertexId1 = vtxBlobs[i].first;
+			const vtx_idx nLastVertexId1  = vtxBlobs[i].second - 1;
 
-			if (maxVertexCountInSubset < subsetMaxIndex - subsetMinIndex + 1)
+			for (int j = i + 1; j < n; ++j)
 			{
-				maxVertexCountInSubset = subsetMaxIndex - subsetMinIndex + 1;
+				const int nFirstIndexId2 = idxBlobs[j].first;
+				const int nLastIndexId2  = idxBlobs[j].second - 1;
+
+				const vtx_idx nFirstVertexId2 = vtxBlobs[j].first;
+				const vtx_idx nLastVertexId2  = vtxBlobs[j].second - 1;
+
+				// index overlap
+				if ((nFirstIndexId2 >= nFirstIndexId1) && (nFirstIndexId2 <= nLastIndexId1))
+					return false;
+				if ((nLastIndexId2  >= nFirstIndexId1) && (nLastIndexId2  <= nLastIndexId1))
+					return false;
+				if ((nFirstIndexId2 <= nFirstIndexId1) && (nLastIndexId2  >= nLastIndexId1))
+					return false;
+
+				// vertex overlap
+				if ((nFirstVertexId2 >= nFirstVertexId1) && (nFirstVertexId2 <= nLastVertexId1))
+					return false;
+				if ((nLastVertexId2  >= nFirstVertexId1) && (nLastVertexId2  <= nLastVertexId1))
+					return false;
+				if ((nFirstVertexId2 <= nFirstVertexId1) && (nLastVertexId2  >= nLastVertexId1))
+					return false;
 			}
 		}
 
-		buffer0.resize(max(maxIndexCountInSubset, maxVertexCountInSubset));
-		buffer1.resize(maxIndexCountInSubset);
-	}
+		return true;
+	};
 
-	int newVertexCount = 0;
-
-	for (int i = 0; i < newMesh.GetSubSetCount(); i++)
+	if (!lambdaSanityCheck())
 	{
-		const SMeshSubset& subset = mesh.m_subsets[i];
+		return false;
+	}
+#endif
+
+	// =========================================================================================================
+#if RESOURCE_COMPILER
+	const unsigned int savedFpeMask = MathHelpers::EnableFloatingPointExceptions(~(_EM_INEXACT | _EM_UNDERFLOW | _EM_OVERFLOW | _EM_ZERODIVIDE | _EM_INVALID));
+#else
+	SCOPED_DISABLE_FLOAT_EXCEPTIONS();
+#endif
+
+	// compiled run-time resources, must not be set when calling this function
+	CRY_ASSERT(curMesh.m_vertexMorphsBitfield.size() == 0);
+	CRY_ASSERT(curMesh.m_verticesDeltaOffsets.size() == 0);
+
+	CMesh newMesh;
+	newMesh.CopyFrom(curMesh);
+	
+	const auto nNewSubsets      = newMesh.GetSubSetCount();
+	const auto pNewIndices      = newMesh.m_pIndices;
+	const auto pNewPositions    = newMesh.m_pPositions;
+	const auto pNewPositionsF16 = newMesh.m_pPositionsF16;
+
+	// TODO: make those variables members of CMeshCompiler so we don't need to allocate memory every time
+#if USE_TOOTLE
+	TootleFaceReorderer tfr(idxMax);
+#else
+	ForsythFaceReorderer ffr;
+#endif
+
+	std::vector<vtx_idx> indicesI(idxMax);
+	std::vector<vtx_idx> indicesO(idxMax);
+	
+	std::vector<Vec3> verticesI(vtxMax);
+	std::vector<Vec3> verticesO(vtxMax);
+
+	std::vector<uint32>  faceClusters(idxMax / 3 + 1);
+	std::vector<vtx_idx> vertexMapping(vtxMax);
+
+	for (int i = 0, n = nNewSubsets; i < n; ++i)
+	{
+		const SMeshSubset& subset = newMesh.m_subsets[i];
 
 		if (subset.nNumIndices == 0)
 		{
 			continue;
 		}
 
-		int subsetMinIndex = mesh.m_pIndices[subset.nFirstIndexId];
-		int subsetMaxIndex = subsetMinIndex;
-		for (int j = 1; j < subset.nNumIndices; ++j)
+		const int nFirstIndexId = idxBlobs[i].first;
+		const int nNextIndexId  = idxBlobs[i].second;
+
+		const vtx_idx nFirstVertexId = vtxBlobs[i].first;
+		const vtx_idx nNextVertexId  = vtxBlobs[i].second;
+
+		const int numFaces = (nNextIndexId - nFirstIndexId) / 3;
+
+		// Get UI32 indices (bStoreIndicesAsU16?)
 		{
-			const int idx = mesh.m_pIndices[subset.nFirstIndexId + j];
-			if (idx < subsetMinIndex)
+			for (int j = nFirstIndexId, n = nNextIndexId; j < n; ++j)
 			{
-				subsetMinIndex = idx;
+				indicesI[j - nFirstIndexId] = pNewIndices[j] - nFirstVertexId;
 			}
-			else if (idx > subsetMaxIndex)
+		}
+		
+		// Get FP32 positions
+		if (pNewPositionsF16)
+		{
+			for (int j = nFirstVertexId, n = nNextVertexId; j < n; ++j)
 			{
-				subsetMaxIndex = idx;
+				verticesI[j - nFirstVertexId] = pNewPositionsF16[j].ToVec3();
+			}
+		}
+		else
+		{
+			for (int j = nFirstVertexId, n = nNextVertexId; j < n; ++j)
+			{
+				verticesI[j - nFirstVertexId] = pNewPositions[j];
 			}
 		}
 
-		for (int j = 0; j < subset.nNumIndices; ++j)
+#if USE_TOOTLE
+		// indicesI -> indicesO
+		if (!tfr.reorderFaces(
+			nNextIndexId - nFirstIndexId,
+			&indicesI[0],     // inVertexIndices
+			nNextVertexId - nFirstVertexId,
+			&verticesI[0],    // inVertexPositions
+			&indicesO[0],     // outVertexIndices
+
+			0,
+			&faceClusters[0], // outVertexClusters
+
+#if RESOURCE_COMPILER && 0
+			// Very slow and precise for offline compilation: O(n^2)
+			1,
+			TootleFaceReorderer::TOOTLE_CLUSTER_VCACHE_OVERDRAW
+#elif RESOURCE_COMPILER
+			// Somewhat quick for realistic offline compilation
+			0,
+			TootleFaceReorderer::TOOTLE_CLUSTER_VCACHE_OVERDRAW
+#else
+			// Fast and approximate for run-time optimization
+			0,
+			TootleFaceReorderer::TOOTLE_APPROX_CLUSTER_VCACHE_OVERDRAW
+#endif
+		))
 		{
-			buffer0[j] = mesh.m_pIndices[subset.nFirstIndexId + j] - subsetMinIndex;
+			return false;
 		}
 
-		const bool bOk = ffr.reorderFaces(
-		  cacheSize,
-		  kVerticesPerFace,
-		  subset.nNumIndices,
-		  &buffer0[0],  // inVertexIndices
-		  &buffer1[0],  // outVertexIndices
-		  0);           // faceToOldFace[] - we don't need it
+		// indicesO -> indicesI
+		// verticesI -> verticesO
+		if (!tfr.reorderVertices(
+			nNextIndexId - nFirstIndexId,
+			&indicesO[0],     // inVertexIndices
+			nNextVertexId - nFirstVertexId,
+			&verticesI[0],    // inVertexPositions
+			&indicesI[0],     // outVertexIndices
+			&verticesO[0],    // outVertexPositions
 
-		if (!bOk)
+			&vertexMapping[0] // outVertexMap
+		))
+		{
+			return false;
+		}
+
+		for (int j = nFirstIndexId, n = nNextIndexId; j < n; ++j)
+		{
+			pNewIndices[j] = indicesI[j - nFirstIndexId] + nFirstVertexId;
+		}
+
+		if (m_logVerbosityLevel > 2)
+		{
+#if RESOURCE_COMPILER
+			RCLog(" subset %3d, clusters %3d: from -> to [ACMR, AOPP, MOPP]: [%.4f %.4f %.4f] -> [%.4f %.4f %.4f]", i, faceClusters[numFaces],
+				tfr.fVCacheIn , tfr.fOverdrawIn , tfr.fMaxOverdrawIn,
+				tfr.fVCacheOut, tfr.fOverdrawOut, tfr.fMaxOverdrawOut);
+#endif
+		}
+#else
+		enum { kCACHESIZE_GEFORCE3 = 24 };
+		const size_t cacheSize = kCACHESIZE_GEFORCE3;
+		if (!ffr.reorderFaces(
+			cacheSize,
+			kVerticesPerFace,
+			nNextIndexId - nFirstIndexId,
+			&indicesI[0],  // inVertexIndices
+			&indicesO[0],  // outVertexIndices
+			0              // faceToOldFace[] - we don't need it
+		))
 		{
 			return false;
 		}
 
 		// Reorder vertices
+		memset(&indicesI[0], -1, sizeof(indicesI[0]) * (nNextVertexId - nFirstVertexId));
+		memset(&vertexMapping[0], -1, sizeof(vertexMapping[0]) * (nNextVertexId - nFirstVertexId));
 
-		SMeshSubset& newSubset = newMesh.m_subsets[i];
-		newSubset.nFirstVertId = newVertexCount;
-		newSubset.nNumVerts = 0;
-		newSubset.nFirstIndexId = subset.nFirstIndexId;
-		newSubset.nNumIndices = subset.nNumIndices;
-
-		const int oldSubsetVertexCount = (int)subsetMaxIndex - (int)subsetMinIndex + 1;
-
-		assert(buffer0.size() >= (size_t)oldSubsetVertexCount);
-		memset(&buffer0[0], -1, sizeof(buffer0[0]) * oldSubsetVertexCount);
-
-		for (int j = 0; j < subset.nNumIndices; ++j)
+		int newVertexIndex = 0;
+		for (int j = nFirstIndexId, n = nNextIndexId; j < n; ++j)
 		{
-			const uint32 idx = buffer1[j];
-			const int oldVertexIndex = subsetMinIndex + idx;
-			if (buffer0[idx] == -1)
+			const int oldVertexIndex = indicesO[j - nFirstIndexId];
+
+			if (indicesI[oldVertexIndex] == -1)
 			{
-				if (m_pVertexMap)
-				{
-					(*m_pVertexMap)[oldVertexIndex] = newVertexCount;
-				}
-				buffer0[idx] = newVertexCount;
-				//copy from old -> new vertex buffer
-				CopyMeshVertex(newMesh, newVertexCount, mesh, oldVertexIndex);
-				++newVertexCount;
-				++newSubset.nNumVerts;
+				indicesI[oldVertexIndex] = newVertexIndex;
+				vertexMapping[oldVertexIndex] = newVertexIndex++;
 			}
-			newMesh.m_pIndices[subset.nFirstIndexId + j] = buffer0[idx];
+
+			pNewIndices[j] = indicesI[oldVertexIndex] + nFirstVertexId;
 		}
+
+		// Unused vertices are not allowed
+		CRY_ASSERT(newVertexIndex == (nNextVertexId - nFirstVertexId));
+#endif
+		if (m_pVertexMap)
+		{
+			for (int j = nFirstVertexId, n = nNextVertexId; j < n; ++j)
+			{
+				const vtx_idx oldVertexIndex = vertexMapping[j - nFirstVertexId];
+				if (oldVertexIndex != -1)
+				{
+					(*m_pVertexMap)[j] = oldVertexIndex + nFirstVertexId;
+				}
+			}
+		}
+
+		auto lambdaRemapAttribute = [&, nFirstVertexId, nNextVertexId] (auto* newAttributeArray, auto* oldAttributeArray)
+		{
+			for (int j = nFirstVertexId, n = nNextVertexId; j < n; ++j)
+			{
+				unsigned int oldIndex = (              j - nFirstVertexId ) + nFirstVertexId;
+				unsigned int newIndex = (vertexMapping[j - nFirstVertexId]) + nFirstVertexId;
+
+				newAttributeArray[newIndex] = oldAttributeArray[oldIndex];
+			}
+		};
+
+		// TODO: for (int stream = 0; stream < CMesh::LAST_STREAM; stream++)
+		if (newMesh.m_pPositions          ) lambdaRemapAttribute(newMesh.m_pPositions          , curMesh.m_pPositions          );
+		if (newMesh.m_pPositionsF16       ) lambdaRemapAttribute(newMesh.m_pPositionsF16       , curMesh.m_pPositionsF16       );
+		if (newMesh.m_pNorms              ) lambdaRemapAttribute(newMesh.m_pNorms              , curMesh.m_pNorms              );
+		if (newMesh.m_pTangents           ) lambdaRemapAttribute(newMesh.m_pTangents           , curMesh.m_pTangents           );
+		if (newMesh.m_pQTangents          ) lambdaRemapAttribute(newMesh.m_pQTangents          , curMesh.m_pQTangents          );
+		if (newMesh.m_pTexCoord           ) lambdaRemapAttribute(newMesh.m_pTexCoord           , curMesh.m_pTexCoord           );
+		if (newMesh.m_pColor0             ) lambdaRemapAttribute(newMesh.m_pColor0             , curMesh.m_pColor0             );
+		if (newMesh.m_pColor1             ) lambdaRemapAttribute(newMesh.m_pColor1             , curMesh.m_pColor1             );
+		if (newMesh.m_pVertMats           ) lambdaRemapAttribute(newMesh.m_pVertMats           , curMesh.m_pVertMats           );
+		if (newMesh.m_pP3S_C4B_T2S        ) lambdaRemapAttribute(newMesh.m_pP3S_C4B_T2S        , curMesh.m_pP3S_C4B_T2S        );
+		
+		if (newMesh.m_pTopologyIds        ) lambdaRemapAttribute(newMesh.m_pTopologyIds        , curMesh.m_pTopologyIds        );
+
+		if (newMesh.m_pBoneMapping        ) lambdaRemapAttribute(newMesh.m_pBoneMapping        , curMesh.m_pBoneMapping        );
+		if (newMesh.m_pExtraBoneMapping   ) lambdaRemapAttribute(newMesh.m_pExtraBoneMapping   , curMesh.m_pExtraBoneMapping   );
 	}
 
-	newMesh.SetVertexCount(newVertexCount);
+#if RESOURCE_COMPILER
+	MathHelpers::EnableFloatingPointExceptions(savedFpeMask);
+#endif
 
-	mesh.CopyFrom(newMesh);
+	curMesh.CopyFrom(newMesh);
 
 	return true;
 }

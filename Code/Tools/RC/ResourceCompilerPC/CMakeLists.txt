@@ -131,11 +131,13 @@ add_sources("NoUberFile"
 	SOURCE_GROUP "MeshCompiler (Cry3DEngine)"
 		"../../../CryEngine/Cry3DEngine/MeshCompiler/MeshCompiler.cpp"
 		"../../../CryEngine/Cry3DEngine/MeshCompiler/ForsythFaceReorderer.cpp"
+		"../../../CryEngine/Cry3DEngine/MeshCompiler/TootleFaceReorderer.cpp"
 		"../../../CryEngine/Cry3DEngine/MeshCompiler/TangentSpaceCalculation.cpp"
 		"../../../SDKs/TangentBasisComputation/mikkelsen/mikktspace.cpp"
 		"../../../CryEngine/Cry3DEngine/MeshCompiler/MeshCompiler.h"
 		"../../../CryEngine/Cry3DEngine/MeshCompiler/TangentSpaceCalculation.h"
 		"../../../CryEngine/Cry3DEngine/MeshCompiler/ForsythFaceReorderer.h"
+		"../../../CryEngine/Cry3DEngine/MeshCompiler/TootleFaceReorderer.h"
 		"../../../SDKs/TangentBasisComputation/mikkelsen/mikktspace.h"
 		"../../../CryEngine/CryAnimation/AttachmentVClothPreProcess.cpp"
 	SOURCE_GROUP "Root"
@@ -210,3 +212,18 @@ endif()
 target_link_libraries(${THIS_PROJECT} PRIVATE Gdi32 Shell32 Ole32 dbghelp Wininet)
 target_link_libraries(${THIS_PROJECT} PRIVATE lua vco)
 set_target_properties(${THIS_PROJECT} PROPERTIES LINK_FLAGS "/DEF:ResourceCompilerPlugin.def")
+
+include("${TOOLS_CMAKE_DIR}/modules/Tootle-enable.cmake")
+
+if(USE_TOOTLE)
+	set (BINARY_FILE_LIST ${OPTIONAL_BINARY_FILES} "${SDK_DIR}/AMD/Tootle-2.2.150/bin/TootleDLL_2k8_64.dll")
+else()
+	set (BINARY_FILE_LIST ${OPTIONAL_BINARY_FILES})
+endif() 
+
+file(GLOB FILES_TO_COPY ${BINARY_FILE_LIST})
+set (RC_BINATY_DIR "${CRYENGINE_SOURCE_DIR}/Tools/rc") 
+foreach(FILENAME ${FILES_TO_COPY})
+	MESSAGE("Copy Binary ${FILENAME} to ${RC_BINATY_DIR}")
+	file(COPY "${FILENAME}" DESTINATION "${RC_BINATY_DIR}")
+endforeach()

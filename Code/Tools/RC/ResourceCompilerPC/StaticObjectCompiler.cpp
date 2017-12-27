@@ -371,18 +371,18 @@ void CStaticObjectCompiler::CompileDeformablePhysData(CContentCGF *pCompiledCGF)
 bool CStaticObjectCompiler::CompileMeshes( CContentCGF *pCGF, bool bIgnoreTangentspaceErrors )
 {
 	// Compile Meshes in all nodes.
-	for (int i=0; i<pCGF->GetNodeCount(); i++)
+	for (int i = 0, n = pCGF->GetNodeCount(); i < n; i++)
 	{
 		CNodeCGF *pNodeCGF = pCGF->GetNode(i);
 
-		if (pNodeCGF->pMesh)
+		if (auto pMesh = pNodeCGF->pMesh)
 		{
 			if (m_logVerbosityLevel > 2)
 			{
 				RCLog("Compiling geometry in node '%s'", pNodeCGF->name);
 			}
 
-			mesh_compiler::CMeshCompiler meshCompiler;
+			mesh_compiler::CMeshCompiler meshCompiler(m_logVerbosityLevel);
 
 			int nMeshCompileFlags = mesh_compiler::MESH_COMPILE_TANGENTS | mesh_compiler::MESH_COMPILE_VALIDATE;
 			if (pCGF->GetExportInfo()->bUseCustomNormals)
@@ -398,7 +398,7 @@ bool CStaticObjectCompiler::CompileMeshes( CContentCGF *pCGF, bool bIgnoreTangen
 				nMeshCompileFlags |= mesh_compiler::MESH_COMPILE_IGNORE_TANGENT_SPACE_ERRORS;
 			}
 
-			if (!meshCompiler.Compile( *pNodeCGF->pMesh, nMeshCompileFlags))
+			if (!meshCompiler.Compile( *pMesh, nMeshCompileFlags))
 			{
 				RCLogError("Failed to compile geometry in node '%s' in file %s - %s",pNodeCGF->name,pCGF->GetFilename(),meshCompiler.GetLastError());
 				return false;
@@ -409,10 +409,47 @@ bool CStaticObjectCompiler::CompileMeshes( CContentCGF *pCGF, bool bIgnoreTangen
 }
 
 //////////////////////////////////////////////////////////////////////////
+bool CStaticObjectCompiler::OptimizeMeshes( CContentCGF *pCGF )
+{
+	// Optimize Meshes in all nodes.
+	for (int i = 0, n = pCGF->GetNodeCount(); i < n; i++)
+	{
+		CNodeCGF *pNodeCGF = pCGF->GetNode(i);
+
+		if (auto pMesh = pNodeCGF->pMesh)
+		{
+			if (m_logVerbosityLevel > 2)
+			{
+				RCLog("Optimizing geometry in node '%s'", pNodeCGF->name);
+			}
+
+			mesh_compiler::CMeshCompiler meshCompiler(m_logVerbosityLevel);
+
+			if (!meshCompiler.Optimize(*pMesh))
+			{
+				RCLogError("Failed to optimize geometry in node '%s' in file %s - %s",pNodeCGF->name,pCGF->GetFilename(),meshCompiler.GetLastError());
+				return false;
+			}
+
+			if (m_bUseOrbisVCO && sizeof(vtx_idx)==sizeof(uint32_t))
+			{
+				uint32_t* const pIndices = (uint32_t*)pMesh->GetStreamPtr<vtx_idx>(CMesh::INDICES);
+				for (int j = 0; j < pMesh->GetSubSetCount(); ++j)
+				{
+					auto& subSet = pMesh->m_subsets[j];
+					OptimizeIndexBufferForOrbis(pIndices + subSet.nFirstIndexId, subSet.nNumIndices);
+				}
+			}
+		}
+	}
+	return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
 void CStaticObjectCompiler::AnalyzeSharedMeshes( CContentCGF *pCGF )
 {
 	// Check if any duplicate meshes exist, and try to share them.
-	mesh_compiler::CMeshCompiler meshCompiler;
+	mesh_compiler::CMeshCompiler meshCompiler(m_logVerbosityLevel);
 	uint32 numNodes = pCGF->GetNodeCount();
 	for (int i = 0; i < numNodes-1; i++)
 	{
@@ -1224,15 +1261,17 @@ bool CStaticObjectCompiler::ProcessCompiledCGF(CContentCGF* pCGF)
 	{
 		CNodeCGF* const pNode = pCGF->GetNode(i);
 		m_pPhysicsInterface->RephysicalizeNode(pNode, pCGF);
+	}
 
-		if (m_bUseOrbisVCO && pNode->pMesh && sizeof(vtx_idx)==sizeof(uint32_t))
+	// Optimize meshes in all nodes.
+	{
+		if (m_logVerbosityLevel > 2)
 		{
-			uint32_t* const pIndices = (uint32_t*)pNode->pMesh->GetStreamPtr<vtx_idx>(CMesh::INDICES);
-			for (int j = 0; j < pNode->pMesh->GetSubSetCount(); ++j)
-			{
-				auto& subSet = pNode->pMesh->m_subsets[j];
-				OptimizeIndexBufferForOrbis(pIndices + subSet.nFirstIndexId, subSet.nNumIndices);
-			}
+			RCLog("Optimizing meshes");
+		}
+		if (!OptimizeMeshes(pCGF))
+		{
+			return 0;
 		}
 	}
 
