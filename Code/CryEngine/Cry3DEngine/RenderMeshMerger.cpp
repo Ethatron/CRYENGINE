@@ -108,7 +108,7 @@ int CRenderMeshMerger::Cmp_RenderChunks_(const void* v1, const void* v2)
 	return Cmp_Materials(pMat1, pMat2);
 }
 
-void CRenderMeshMerger::IsChunkValid(CRenderChunk& Ch, PodArray<SVF_P3S_C4B_T2S>& m_lstVerts, PodArray<uint32>& m_lstIndices)
+void CRenderMeshMerger::IsChunkValid(CRenderChunk& Ch, PodArray<SVF_P3H_C4B_T2H>& m_lstVerts, PodArray<uint32>& m_lstIndices)
 {
 #ifdef _DEBUG
 	assert(Ch.nFirstIndexId + Ch.nNumIndices <= (uint32)m_lstIndices.Count());
@@ -219,7 +219,7 @@ void CRenderMeshMerger::MakeListOfAllCRenderChunks(SMergeInfo& info)
 		byte* pNorm = 0;
 		byte* pTangs = 0;
 
-		if (pRM->GetVertexFormat() != EDefaultInputLayouts::P3S_N4B_C4B_T2S)
+		if (pRM->GetVertexFormat() != EDefaultInputLayouts::P3H_C4B_T2H_N4C)
 		{
 			pTangs = pRM->GetTangentPtr(nTangsStride, FSL_READ);
 		}
@@ -344,7 +344,7 @@ void CRenderMeshMerger::MakeListOfAllCRenderChunks(SMergeInfo& info)
 		{
 			assert(v >= 0 && v < pRM->GetVerticesCount());
 
-			SVF_P3S_C4B_T2S vert;
+			SVF_P3H_C4B_T2H vert;
 
 			// set pos
 			Vec3 vPos = pPos[nPosStride * v];
@@ -366,8 +366,8 @@ void CRenderMeshMerger::MakeListOfAllCRenderChunks(SMergeInfo& info)
 			m_lstVerts.Add(vert);
 
 			// get tangent basis + normal
-			SPipTangents basis = SPipTangents(Vec4sf(0, 0, 0, 0), Vec4sf(0, 0, 0, 0));
-			SPipNormal normal = SPipNormal(Vec3(0, 0, 0));
+			SPipTangents basis = SPipTangents(Vec4i16(0, 0, 0, 0), Vec4i16(0, 0, 0, 0));
+			SPipNormal normal = SPipNormal(Vec4i16(0, 0, 0, 0));
 
 			assert((pTangs) || (!pNorm));
 			if (pTangs)
@@ -385,7 +385,9 @@ void CRenderMeshMerger::MakeListOfAllCRenderChunks(SMergeInfo& info)
 					basis.TransformSafelyBy(pRMI->mat);
 #if ENABLE_NORMALSTREAM_SUPPORT
 					if (pNorm)
+					{
 						normal.TransformSafelyBy(pRMI->mat);
+					}
 #endif
 				}
 			}
@@ -433,7 +435,7 @@ void CRenderMeshMerger::CompactVertices(SMergeInfo& info)
 	for (int i = 0; i < m_lstIndices.Count(); i++)
 		lstVertUsage[m_lstIndices[i]] = 1;
 
-	PodArray<SVF_P3S_C4B_T2S> lstVertsOptimized;
+	PodArray<SVF_P3H_C4B_T2H> lstVertsOptimized;
 	lstVertsOptimized.PreAllocate(m_lstVerts.Count());
 	PodArray<SPipTangents> lstTangBasisesOptimized;
 	lstTangBasisesOptimized.PreAllocate(m_lstVerts.Count());
@@ -652,7 +654,7 @@ bool CRenderMeshMerger::ClipTriangle(int nStartIdxId, Plane* pPlanes, int nPlane
 	// replace old triangle with several new triangles
 	int nStartId = m_lstVerts.Count();
 	int nStartIndex = m_lstIndices[nStartIdxId + 0];
-	SVF_P3S_C4B_T2S fullVert = m_lstVerts[nStartIndex];
+	SVF_P3H_C4B_T2H fullVert = m_lstVerts[nStartIndex];
 	SPipTangents fullTang = m_lstTangBasises[nStartIndex];
 #if ENABLE_NORMALSTREAM_SUPPORT
 	SPipNormal fullNorm = m_lstNormals[nStartIndex];
@@ -1068,7 +1070,7 @@ _smart_ptr<IRenderMesh> CRenderMeshMerger::MergeRenderMeshes(SRenderMeshInfoInpu
 		IRenderMesh::SInitParamerers params;
 		params.pVertBuffer = m_lstNewVerts.GetElements();
 		params.nVertexCount = m_lstNewVerts.Count();
-		params.eVertexFormat = EDefaultInputLayouts::P3S_C4B_T2S;
+		params.eVertexFormat = EDefaultInputLayouts::P3H_C4B_T2H;
 		params.pIndices = m_lstNewIndices.GetElements();
 		params.nIndexCount = m_lstNewIndices.Count();
 		params.pTangents = m_lstNewTangBasises.GetElements();
@@ -1314,7 +1316,7 @@ void CRenderMeshMerger::MergeBuffers(AABB& bounds)
 	arrIndices.clear();
 	arrIndices.reserve(nNeedIndices);
 
-	PodArray<SVF_P3S_C4B_T2S>& arrVertices = m_lstVerts;
+	PodArray<SVF_P3H_C4B_T2H>& arrVertices = m_lstVerts;
 	arrVertices.clear();
 	arrVertices.reserve(nNeedVertices);
 
@@ -1372,7 +1374,7 @@ void CRenderMeshMerger::MergeBuffersImpl(AABB* pBounds, SMergeBuffersData* _arrM
 	SMergeBuffersData* arrMergeBuffersData = _arrMergeBuffersData;
 
 	PodArray<vtx_idx>& arrIndices = m_lstNewIndices;
-	PodArray<SVF_P3S_C4B_T2S>& arrVertices = m_lstVerts;
+	PodArray<SVF_P3H_C4B_T2H>& arrVertices = m_lstVerts;
 	PodArray<SPipTangents>& arrTangents = m_lstTangBasises;
 
 #if ENABLE_NORMALSTREAM_SUPPORT
@@ -1470,7 +1472,7 @@ void CRenderMeshMerger::MergeBuffersImpl(AABB* pBounds, SMergeBuffersData* _arrM
 		int numVert = renderChunk.rChunk.nFirstVertId + renderChunk.rChunk.nNumVerts;
 		if (bMatrixHasRotation)
 		{
-			SVF_P3S_C4B_T2S* __restrict pDstVerts = &arrVertices[0];
+			SVF_P3H_C4B_T2H* __restrict pDstVerts = &arrVertices[0];
 			SPipTangents* __restrict pDstTangs = &arrTangents[0];
 #if ENABLE_NORMALSTREAM_SUPPORT
 			SPipNormal* __restrict pDstNorms = &arrNormals[0];
@@ -1485,7 +1487,7 @@ void CRenderMeshMerger::MergeBuffersImpl(AABB* pBounds, SMergeBuffersData* _arrM
 #endif
 			for (; v < numVert; v++, nCurrVertex++)
 			{
-				SVF_P3S_C4B_T2S& vert = pDstVerts[nCurrVertex];
+				SVF_P3H_C4B_T2H& vert = pDstVerts[nCurrVertex];
 				SPipTangents& basis = pDstTangs[nCurrVertex];
 #if ENABLE_NORMALSTREAM_SUPPORT
 				SPipNormal& normal = pDstNorms[nCurrVertex];
@@ -1502,9 +1504,11 @@ void CRenderMeshMerger::MergeBuffersImpl(AABB* pBounds, SMergeBuffersData* _arrM
 				basis = *(SPipTangents*)&pSrcTangs[nTangsStride * v];
 
 #if ENABLE_NORMALSTREAM_SUPPORT
-				normal = SPipNormal(Vec3(0, 0, 0));
+				normal = SPipNormal(Vec4i16(0, 0, 0, 0));
 				if (pSrcNorm)
+				{
 					normal = *(SPipNormal*)&pSrcNorm[nNormStride * v];
+				}
 #endif
 
 				if (bMatrixHasRotation)
@@ -1521,7 +1525,7 @@ void CRenderMeshMerger::MergeBuffersImpl(AABB* pBounds, SMergeBuffersData* _arrM
 		}
 		else
 		{
-			SVF_P3S_C4B_T2S* __restrict pDstVerts = &arrVertices[0];
+			SVF_P3H_C4B_T2H* __restrict pDstVerts = &arrVertices[0];
 			SPipTangents* __restrict pDstTangs = &arrTangents[0];
 #if ENABLE_NORMALSTREAM_SUPPORT
 			SPipNormal* __restrict pDstNorms = &arrNormals[0];
@@ -1536,7 +1540,7 @@ void CRenderMeshMerger::MergeBuffersImpl(AABB* pBounds, SMergeBuffersData* _arrM
 #endif
 			for (; v < numVert; v++, nCurrVertex++)
 			{
-				SVF_P3S_C4B_T2S& vert = pDstVerts[nCurrVertex];
+				SVF_P3H_C4B_T2H& vert = pDstVerts[nCurrVertex];
 				SPipTangents& basis = pDstTangs[nCurrVertex];
 
 #if ENABLE_NORMALSTREAM_SUPPORT
@@ -1555,7 +1559,7 @@ void CRenderMeshMerger::MergeBuffersImpl(AABB* pBounds, SMergeBuffersData* _arrM
 				basis = *(SPipTangents*)&pSrcTangs[nTangsStride * v];
 
 #if ENABLE_NORMALSTREAM_SUPPORT
-				normal = SPipNormal(Vec3(0, 0, 0));
+				normal = SPipNormal(Vec4i16(0, 0, 0, 0));
 				if (pSrcNorm)
 				{
 					normal = *(SPipNormal*)(&pSrcNorm[nNormStride * v]);
@@ -1647,7 +1651,7 @@ _smart_ptr<IRenderMesh> CRenderMeshMerger::MergeRenderMeshes(SRenderMeshInfoInpu
 	IRenderMesh::SInitParamerers params;
 	params.pVertBuffer = &m_lstVerts.front();
 	params.nVertexCount = m_lstVerts.size();
-	params.eVertexFormat = EDefaultInputLayouts::P3S_C4B_T2S;
+	params.eVertexFormat = EDefaultInputLayouts::P3H_C4B_T2H;
 	params.pIndices = &m_lstNewIndices.front();
 	params.nIndexCount = m_lstNewIndices.size();
 	params.pTangents = &m_lstTangBasises.front();

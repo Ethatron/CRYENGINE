@@ -98,7 +98,7 @@ public:
 			return static_cast<T*>(pPositions)[nVtxIndex];
 		}
 
-		SVF_W4B_I4S&  GetSkinningInfo(int nVtxIndex);
+		SVF_W4B_I4U&  GetSkinningInfo(vtx_idx nVtxIndex);
 		vtx_idx&      GetVertexIndex(int i);
 		InputLayoutHandle GetVertexFormat();
 	};

@@ -415,8 +415,8 @@ static int InjectVertices(CMesh* pMesh, int nNewVtx, SMeshBoneMapping_uint8*& pB
 	pMesh->ReallocStream(CMesh::NORMALS, nVtx);
 	pMesh->ReallocStream(CMesh::TEXCOORDS, nVtx);
 	pMesh->ReallocStream(CMesh::TANGENTS, nVtx);
-	if (pMesh->m_pColor0)
-		pMesh->ReallocStream(CMesh::COLORS_0, nVtx);
+	if (pMesh->m_pColors)
+		pMesh->ReallocStream(CMesh::COLORS, nVtx);
 
 	for (i = (int)pMesh->m_subsets.size() - 1; i >= 0; i--)
 	{
@@ -427,14 +427,14 @@ static int InjectVertices(CMesh* pMesh, int nNewVtx, SMeshBoneMapping_uint8*& pB
 			{
 				j = pMesh->m_subsets[i].nFirstVertId;
 				memmove(pMesh->m_pPositions + j + nNewVtx, pMesh->m_pPositions + j, sizeof(pMesh->m_pPositions[0]) * pMesh->m_subsets[i].nNumVerts);
-				memmove(pMesh->m_pNorms + j + nNewVtx, pMesh->m_pNorms + j, sizeof(pMesh->m_pNorms[0]) * pMesh->m_subsets[i].nNumVerts);
+				memmove(pMesh->m_pNormals + j + nNewVtx, pMesh->m_pNormals + j, sizeof(pMesh->m_pNormals[0]) * pMesh->m_subsets[i].nNumVerts);
 				memmove(pMesh->m_pTexCoord + j + nNewVtx, pMesh->m_pTexCoord + j, sizeof(pMesh->m_pTexCoord[0]) * pMesh->m_subsets[i].nNumVerts);
 				if (pMesh->m_pTangents)
 					memmove(pMesh->m_pTangents + j + nNewVtx, pMesh->m_pTangents + j, sizeof(pMesh->m_pTangents[0]) * pMesh->m_subsets[i].nNumVerts);
 				if (pMesh->m_pQTangents)
 					memmove(pMesh->m_pQTangents + j + nNewVtx, pMesh->m_pQTangents + j, sizeof(pMesh->m_pQTangents[0]) * pMesh->m_subsets[i].nNumVerts);
-				if (pMesh->m_pColor0)
-					memmove(pMesh->m_pColor0 + j + nNewVtx, pMesh->m_pColor0 + j, sizeof(pMesh->m_pColor0[0]) * pMesh->m_subsets[i].nNumVerts);
+				if (pMesh->m_pColors)
+					memmove(pMesh->m_pColors + j + nNewVtx, pMesh->m_pColors + j, sizeof(pMesh->m_pColors[0]) * pMesh->m_subsets[i].nNumVerts);
 				pMesh->m_subsets[i].nFirstVertId += nNewVtx;
 				for (j = pMesh->m_subsets[i].nFirstIndexId; j < pMesh->m_subsets[i].nFirstIndexId + pMesh->m_subsets[i].nNumIndices; j++)
 					pMesh->m_pIndices[j] += nNewVtx;
@@ -499,11 +499,11 @@ IStatObj* C3DEngine::UpdateDeformableStatObj(IGeometry* pPhysGeom, bop_meshupdat
     meshAppend.ReallocStream(CMesh::TEXCOORDS, nNewVtx + 32);                                   \
     meshAppend.ReallocStream(CMesh::TANGENTS, nNewVtx + 32);                                    \
     if (bHasColors[0]) {                                                                        \
-      meshAppend.ReallocStream(CMesh::COLORS_0, nNewVtx + 32);                                  \
-      pColors[0].ptr[1] = meshAppend.m_pColor0;                                                 \
+      meshAppend.ReallocStream(CMesh::COLORS, nNewVtx + 32);                                  \
+      pColors[0].ptr[1] = meshAppend.m_pColors;                                                 \
     }                                                                                           \
     pVtxMap.ptr[1] = (int*)realloc(pVtxMap.ptr[1], (nNewVtx + 32) * sizeof(pVtxMap.ptr[1][0])); \
-    pVtx.ptr[1] = meshAppend.m_pPositions; pNormals[0].ptr[1] = meshAppend.m_pNorms;            \
+    pVtx.ptr[1] = meshAppend.m_pPositions; pNormals[0].ptr[1] = meshAppend.m_pNormals;            \
     pTexCoord[0].ptr[1] = meshAppend.m_pTexCoord; pTangents[0].ptr[1] = meshAppend.m_pTangents; \
   }                                                                                             \
   ivtx = nNewVtx++ | 1 << 15
@@ -554,13 +554,13 @@ IStatObj* C3DEngine::UpdateDeformableStatObj(IGeometry* pPhysGeom, bop_meshupdat
 	pPhysMesh = (mesh_data*)pPhysGeom->GetData();
 	pMesh[0] = pIndexedMesh[0]->GetMesh();
 	assert(pMesh[0]->m_pPositionsF16 == 0);
-	bHasColors[0] = pMesh[0]->m_pColor0 != 0;
+	bHasColors[0] = pMesh[0]->m_pColors != 0;
 	nNewVtx = 0;
 	pVtx.ptr[0] = pMesh[0]->m_pPositions;
-	pNormals[0].ptr[0] = pMesh[0]->m_pNorms;
+	pNormals[0].ptr[0] = pMesh[0]->m_pNormals;
 	pTexCoord[0].ptr[0] = pMesh[0]->m_pTexCoord;
 	pTangents[0].ptr[0] = pMesh[0]->m_pTangents;
-	pColors[0].ptr[0] = pMesh[0]->m_pColor0;
+	pColors[0].ptr[0] = pMesh[0]->m_pColors;
 	pVtxMap.ptr[0] = pPhysMesh->pVtxMap;
 	memset(pVtxWeld = new int[pPhysMesh->nVertices], -1, pPhysMesh->nVertices * sizeof(int));
 	memset(pRemovedVtxMask = new unsigned int[((pPhysMesh->nVertices - 1) >> 5) + 1], 0, (((pPhysMesh->nVertices - 1) >> 5) + 1) * sizeof(int));
@@ -589,10 +589,10 @@ IStatObj* C3DEngine::UpdateDeformableStatObj(IGeometry* pPhysGeom, bop_meshupdat
 	InjectVertices(pMesh[0], nNewPhysVtx = max(0, pPhysMesh->nVertices - nVtx0), ((CStatObj*)pStatObj[0])->m_pBoneMapping);
 
 	pVtx.ptr[0] = pMesh[0]->m_pPositions;
-	pNormals[0].ptr[0] = pMesh[0]->m_pNorms;
+	pNormals[0].ptr[0] = pMesh[0]->m_pNormals;
 	pTexCoord[0].ptr[0] = pMesh[0]->m_pTexCoord;
 	pTangents[0].ptr[0] = pMesh[0]->m_pTangents;
-	pColors[0].ptr[0] = pMesh[0]->m_pColor0;
+	pColors[0].ptr[0] = pMesh[0]->m_pColors;
 	pColors[0].ptr[1] = &clrDummy;
 
 	nTris0 = max(nTris0, itri + 1);
@@ -633,10 +633,10 @@ IStatObj* C3DEngine::UpdateDeformableStatObj(IGeometry* pPhysGeom, bop_meshupdat
 			pmu->pMesh[1]->Lock(0);
 		pMesh[1] = pIndexedMesh[1]->GetMesh();
 		//		pPhysMesh1 = (mesh_data*)pmu->pMesh[1]->GetData();
-		pNormals[1].ptr[0] = pMesh[1]->m_pNorms;
+		pNormals[1].ptr[0] = pMesh[1]->m_pNormals;
 		pTexCoord[1].ptr[0] = pMesh[1]->m_pTexCoord;
 		pTangents[1].ptr[0] = pMesh[1]->m_pTangents;
-		bHasColors[1] = (pColors[1].ptr[0] = pMesh[1]->m_pColor0) != 0;
+		bHasColors[1] = (pColors[1].ptr[0] = pMesh[1]->m_pColors) != 0;
 
 		nTris0 = pMesh[0]->GetIndexCount() / 3;
 		pMesh[1] = pIndexedMesh[1]->GetMesh();
@@ -722,7 +722,7 @@ IStatObj* C3DEngine::UpdateDeformableStatObj(IGeometry* pPhysGeom, bop_meshupdat
 
 			pNormals[0][pmu->pNewVtx[i].idx] = SMeshNormal(Vec3(0, 0, 1));
 			pTexCoord[0][pmu->pNewVtx[i].idx] = SMeshTexCoord(0, 0);
-			pTangents[0][pmu->pNewVtx[i].idx] = SMeshTangents(Vec4sf(0, 0, 0, 0), Vec4sf(0, 0, 0, 0));
+			pTangents[0][pmu->pNewVtx[i].idx] = SMeshTangents(Vec4i16(0, 0, 0, 0), Vec4i16(0, 0, 0, 0));
 			pColors[0][pmu->pNewVtx[i].idx & - bHasColors[0]] = clrDummy;
 		}
 
@@ -973,7 +973,7 @@ IStatObj* C3DEngine::UpdateDeformableStatObj(IGeometry* pPhysGeom, bop_meshupdat
 								pMesh[0]->ReallocStream(CMesh::TEXCOORDS, ivtxNew + pMesh[1]->m_subsets[i].nNumVerts);
 								pMesh[0]->ReallocStream(CMesh::TANGENTS, ivtxNew + pMesh[1]->m_subsets[i].nNumVerts);
 								if (bHasColors[0])
-									pMesh[0]->ReallocStream(CMesh::COLORS_0, ivtxNew + pMesh[1]->m_subsets[i].nNumVerts);
+									pMesh[0]->ReallocStream(CMesh::COLORS, ivtxNew + pMesh[1]->m_subsets[i].nNumVerts);
 
 								pMesh[0]->m_subsets[i].nFirstVertId = ivtxNew;
 								itri = (pMesh[0]->m_subsets[i].nFirstIndexId = pMesh[0]->GetIndexCount()) / 3;
@@ -990,11 +990,11 @@ IStatObj* C3DEngine::UpdateDeformableStatObj(IGeometry* pPhysGeom, bop_meshupdat
 											ivtx = ivtxNew++;
 											pMesh[0]->m_subsets[i].nNumVerts++;
 											pMesh[0]->m_pPositions[ivtx] = pMesh[1]->m_pPositions[j1];
-											pMesh[0]->m_pNorms[ivtx] = pMesh[1]->m_pNorms[j1];
+											pMesh[0]->m_pNormals[ivtx] = pMesh[1]->m_pNormals[j1];
 											pMesh[0]->m_pTexCoord[ivtx] = pMesh[1]->m_pTexCoord[j1];
 											pMesh[0]->m_pTangents[ivtx] = pMesh[1]->m_pTangents[j1];
 											if (bHasColors[0])
-												pMesh[0]->m_pColor0[ivtx] = pMesh[1]->m_pColor0[j1];
+												pMesh[0]->m_pColors[ivtx] = pMesh[1]->m_pColors[j1];
 											pUsedVtx[j1] = ivtx;
 										}
 										pMesh[0]->m_pIndices[itri * 3 + i1] = ivtx;
@@ -1046,8 +1046,8 @@ IStatObj* C3DEngine::UpdateDeformableStatObj(IGeometry* pPhysGeom, bop_meshupdat
 
 	meshAppend.m_streamSize[CMesh::POSITIONS] = meshAppend.m_streamSize[CMesh::NORMALS] =
 	                                              meshAppend.m_streamSize[CMesh::TEXCOORDS] = meshAppend.m_streamSize[CMesh::TANGENTS] = nNewVtx;
-	if (meshAppend.m_pColor0)
-		meshAppend.m_streamSize[CMesh::COLORS_0] = nNewVtx;
+	if (meshAppend.m_pColors)
+		meshAppend.m_streamSize[CMesh::COLORS] = nNewVtx;
 	//pMesh[0]->Append(meshAppend);
 	InjectVertices(pMesh[0], nNewVtx, ((CStatObj*)pStatObj[0])->m_pBoneMapping);
 	for (i = 0; i < CMesh::LAST_STREAM; i++)
@@ -2757,7 +2757,7 @@ int CStatObj::Serialize(TSerialize ser)
 				}
 
 				SerializeData(ser, "Positions", pMesh->m_pPositions, nVtx * sizeof(pMesh->m_pPositions[0]));
-				SerializeData(ser, "Normals", pMesh->m_pNorms, nVtx * sizeof(pMesh->m_pNorms[0]));
+				SerializeData(ser, "Normals", pMesh->m_pNormals, nVtx * sizeof(pMesh->m_pNormals[0]));
 				SerializeData(ser, "TexCoord", pMesh->m_pTexCoord, nVtx * sizeof(pMesh->m_pTexCoord[0]));
 				SerializeData(ser, "Tangents", pMesh->m_pTangents, nVtx * sizeof(pMesh->m_pTangents[0]));
 				SerializeData(ser, "Indices", pMesh->m_pIndices, nTris * 3 * sizeof(pMesh->m_pIndices[0]));
@@ -2838,7 +2838,7 @@ int CStatObj::Serialize(TSerialize ser)
 					ser.Value("auxmatname", m_pMaterial->GetSubMtl(m_pMaterial->GetSubMtlCount() - 1)->GetName());
 
 				SerializeData(ser, "Positions", pMesh->m_pPositions, nVtx * sizeof(pMesh->m_pPositions[0]));
-				SerializeData(ser, "Normals", pMesh->m_pNorms, nVtx * sizeof(pMesh->m_pNorms[0]));
+				SerializeData(ser, "Normals", pMesh->m_pNormals, nVtx * sizeof(pMesh->m_pNormals[0]));
 				SerializeData(ser, "TexCoord", pMesh->m_pTexCoord, nVtx * sizeof(pMesh->m_pTexCoord[0]));
 				SerializeData(ser, "Tangents", pMesh->m_pTangents, nVtx * sizeof(pMesh->m_pTangents[0]));
 				SerializeData(ser, "Indices", pMesh->m_pIndices, nTris * 3 * sizeof(pMesh->m_pIndices[0]));

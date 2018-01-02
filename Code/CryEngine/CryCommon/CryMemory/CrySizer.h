@@ -27,8 +27,8 @@
 struct AABB;
 struct SVF_P3F;
 struct SVF_P3F_C4B_T2F;
-struct SVF_P3F_C4B_T2S;
-struct SVF_P3S_C4B_T2S;
+struct SVF_P3F_C4B_T2H;
+struct SVF_P3H_C4B_T2H;
 struct SPipTangents;
 
 #if CRY_PLATFORM_WINDOWS && CRY_PLATFORM_64BIT
@@ -214,8 +214,8 @@ public:
 	void AddObject(const AABB&)                        {}
 	void AddObject(const SVF_P3F&)                     {}
 	void AddObject(const SVF_P3F_C4B_T2F&)             {}
-	void AddObject(const SVF_P3F_C4B_T2S&)             {}
-	void AddObject(const SVF_P3S_C4B_T2S&)             {}
+	void AddObject(const SVF_P3F_C4B_T2H&)             {}
+	void AddObject(const SVF_P3H_C4B_T2H&)             {}
 	void AddObject(const SPipTangents&)                {}
 	void AddObject(void*)                              {}
 

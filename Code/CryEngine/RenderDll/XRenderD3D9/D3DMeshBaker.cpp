@@ -190,7 +190,7 @@ bool CREBaker::mfDraw(CShader* ef, SShaderPass* sfm)
 			vtx_idx* pInIndices = pInputMesh->GetStreamPtr<vtx_idx>(CMesh::INDICES);
 			SMeshTexCoord* pInTexCoords = pInputMesh->GetStreamPtr<SMeshTexCoord>(CMesh::TEXCOORDS);
 			SMeshTangents* pInTangents = pInputMesh->GetStreamPtr<SMeshTangents>(CMesh::TANGENTS);
-			SMeshColor* pInColors = pInputMesh->GetStreamPtr<SMeshColor>(CMesh::COLORS_0);
+			SMeshColor* pInColors = pInputMesh->GetStreamPtr<SMeshColor>(CMesh::COLORS);
 			Matrix44* pTexMtx = NULL;
 			if (rd->m_RP.m_pShaderResources)
 			{

@@ -116,7 +116,7 @@ struct SSetMeshIntData
 	vtx_idx *m_pInds;
 	const Vec3 *m_pPosOffset;
 	uint32 m_flags;
- 	Vec3 *m_pNormalsBuff;
+ 	SPipNormal *m_pNormalsBuff;
 };
 
 class CRenderMesh : public IRenderMesh
@@ -141,13 +141,13 @@ private:
 
 	struct SBoneIndexStreamRequest
 	{
-		SBoneIndexStreamRequest(uint32 _guid, SVF_W4B_I4S *_pStream, SMeshBoneMapping_uint16 *_pExtraStream) :
+		SBoneIndexStreamRequest(uint32 _guid, SVF_W4B_I4U *_pStream, SMeshBoneMapping_uint16 *_pExtraStream) :
 			pStream(_pStream), 
 			pExtraStream(_pExtraStream), 
 			guid(_guid), refcount(1) 
 		{}
 
-		SVF_W4B_I4S *pStream;
+		SVF_W4B_I4U *pStream;
 		SMeshBoneMapping_uint16 *pExtraStream;
 		uint32 guid; 
 		uint32 refcount; 
@@ -289,16 +289,17 @@ public:
 		{
 			switch (nStream)
 			{
-		#ifdef TANG_FLOATS
+		#ifdef NORM_FLOATS
 				case VSF_TANGENTS       : eVF = EDefaultInputLayouts::T4F_B4F; break;
 				case VSF_QTANGENTS      : eVF = EDefaultInputLayouts::Q4F; break;
+				case VSF_NORMALS        : eVF = EDefaultInputLayouts::N3F; break;
 		#else
 				case VSF_TANGENTS       : eVF = EDefaultInputLayouts::T4S_B4S; break;
 				case VSF_QTANGENTS      : eVF = EDefaultInputLayouts::Q4S; break;
+				case VSF_NORMALS        : eVF = EDefaultInputLayouts::N3S; break;
 		#endif
-				case VSF_HWSKIN_INFO    : eVF = EDefaultInputLayouts::W4B_I4S; break;
+				case VSF_HWSKIN_INFO    : eVF = EDefaultInputLayouts::W4B_I4U; break;
 				case VSF_VERTEX_VELOCITY: eVF = EDefaultInputLayouts::V3F; break;
-				case VSF_NORMALS        : eVF = EDefaultInputLayouts::N3F; break;
 			}
 		}
 
@@ -555,7 +556,7 @@ public:
 	std::shared_ptr<compute_skinning::IPerMeshDataSupply> m_computeSkinningDataSupply;
 	uint32 m_nMorphs;
 
-	void ComputeSkinningCreateSkinningBuffers(const SVF_W4B_I4S* pBoneMapping, const SMeshBoneMapping_uint16* pExtraBoneMapping);
+	void ComputeSkinningCreateSkinningBuffers(const SVF_W4B_I4U* pBoneMapping, const SMeshBoneMapping_uint16* pExtraBoneMapping);
 	void ComputeSkinningCreateBindPoseAndMorphBuffers(CMesh& mesh);
 	SMeshBoneMapping_uint16* m_pExtraBoneMapping;
 

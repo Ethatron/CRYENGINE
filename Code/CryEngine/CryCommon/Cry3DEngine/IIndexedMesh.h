@@ -236,6 +236,11 @@ public:
 		Normal = othern;
 	}
 
+	void ExportTo(SPipNormal& other) const
+	{
+		other.Normal = PackingSNorm::tPackF2Bv(Normal);
+	}
+
 	bool operator==(const SMeshNormal& othern) const
 	{
 		return (Normal.x == othern.Normal.x) && (Normal.y == othern.Normal.y) && (Normal.z == othern.Normal.z);
@@ -319,11 +324,11 @@ struct SMeshTangents
 	SMeshTangents() {}
 
 private:
-	Vec4sf Tangent;
-	Vec4sf Bitangent;
+	Vec4i16 Tangent;
+	Vec4i16 Bitangent;
 
 public:
-	explicit SMeshTangents(const Vec4sf& othert, const Vec4sf& otherb)
+	explicit SMeshTangents(const Vec4i16& othert, const Vec4i16& otherb)
 	{
 		Tangent = othert;
 		Bitangent = otherb;
@@ -348,17 +353,17 @@ public:
 		if (othert.Cross(otherb).Dot(othern) < 0)
 			othersign = -1;
 
-		Tangent = Vec4sf(PackingSNorm::tPackF2B(othert.x), PackingSNorm::tPackF2B(othert.y), PackingSNorm::tPackF2B(othert.z), PackingSNorm::tPackS2B(othersign));
-		Bitangent = Vec4sf(PackingSNorm::tPackF2B(otherb.x), PackingSNorm::tPackF2B(otherb.y), PackingSNorm::tPackF2B(otherb.z), PackingSNorm::tPackS2B(othersign));
+		Tangent = Vec4i16(PackingSNorm::tPackF2B(othert.x), PackingSNorm::tPackF2B(othert.y), PackingSNorm::tPackF2B(othert.z), PackingSNorm::tPackS2B(othersign));
+		Bitangent = Vec4i16(PackingSNorm::tPackF2B(otherb.x), PackingSNorm::tPackF2B(otherb.y), PackingSNorm::tPackF2B(otherb.z), PackingSNorm::tPackS2B(othersign));
 	}
 
 	explicit SMeshTangents(const Vec3& othert, const Vec3& otherb, const int16& othersign)
 	{
-		Tangent = Vec4sf(PackingSNorm::tPackF2B(othert.x), PackingSNorm::tPackF2B(othert.y), PackingSNorm::tPackF2B(othert.z), PackingSNorm::tPackS2B(othersign));
-		Bitangent = Vec4sf(PackingSNorm::tPackF2B(otherb.x), PackingSNorm::tPackF2B(otherb.y), PackingSNorm::tPackF2B(otherb.z), PackingSNorm::tPackS2B(othersign));
+		Tangent = Vec4i16(PackingSNorm::tPackF2B(othert.x), PackingSNorm::tPackF2B(othert.y), PackingSNorm::tPackF2B(othert.z), PackingSNorm::tPackS2B(othersign));
+		Bitangent = Vec4i16(PackingSNorm::tPackF2B(otherb.x), PackingSNorm::tPackF2B(otherb.y), PackingSNorm::tPackF2B(otherb.z), PackingSNorm::tPackS2B(othersign));
 	}
 
-	void ExportTo(Vec4sf& othert, Vec4sf& otherb) const
+	void ExportTo(Vec4i16& othert, Vec4i16& otherb) const
 	{
 		othert = Tangent;
 		otherb = Bitangent;
@@ -404,7 +409,7 @@ public:
 		  (btg3.Dot(otherb) >= (1.0f - epsilon));
 	}
 
-	void GetTB(Vec4sf& othert, Vec4sf& otherb) const
+	void GetTB(Vec4i16& othert, Vec4i16& otherb) const
 	{
 		othert = Tangent;
 		otherb = Bitangent;
@@ -557,7 +562,7 @@ struct SMeshQTangents
 	SMeshQTangents() {}
 
 private:
-	Vec4sf TangentBitangent;
+	Vec4i16 TangentBitangent;
 
 public:
 	explicit SMeshQTangents(const SPipQTangents& other)
@@ -854,49 +859,56 @@ class CMesh
 public:
 	enum EStream
 	{
-		POSITIONS = 0,
-		POSITIONSF16,
+		// Unserialized geometry data maintained in an uncompiled Mesh
+		INDICES = 0,
+		POSITIONS,
 		NORMALS,
-		FACES,
-		TOPOLOGY_IDS,
 		TEXCOORDS,
-		COLORS_0,
-		COLORS_1,
-		INDICES,
-		TANGENTS,
-		BONEMAPPING,
-		VERT_MATS,
-		QTANGENTS,
-		P3S_C4B_T2S,
+		COLORS,
+		TOPOLOGY_IDS,
 
+		// Temporary geometry data generated when loading an uncompiled Mesh
+		FACES,
+
+		// Serialized data only found in a compiled Mesh (can be back-converted)
+		TANGENTS,
+		QTANGENTS,
+		SUBSET_IDS,
+		BONEMAPPING,
 		EXTRABONEMAPPING,     //!< Extra stream. Does not have a stream ID in the CGF. Its data is saved at the end of the BONEMAPPING stream.
+
+		// Compacted and streamable data found in a compiled Mesh (can be back-converted)
+		POSITIONSF16,
+		P3S_C4B_T2S,
 
 		LAST_STREAM,
 	};
 
-	SMeshFace* m_pFaces;      //!< Faces are used in mesh processing/compilation.
-	int32*     m_pTopologyIds;
+	int                      m_streamSize[LAST_STREAM];
 
-	// Geometry data.
-	vtx_idx*                 m_pIndices; //!< Indices are used for the final render-mesh.
+	// Unserialized geometry data maintained in an uncompiled Mesh
+	vtx_idx*                 m_pIndices;          //!< Indices are used for the final render-mesh.
 	Vec3*                    m_pPositions;
-	Vec3f16*                 m_pPositionsF16;
+	SMeshNormal*             m_pNormals;
+	SMeshTexCoord*           m_pTexCoord;
+	SMeshColor*              m_pColors;
+	int32*                   m_pTopologyIds;
 
-	SMeshNormal*             m_pNorms;
+	// Temporary geometry data generated when loading an uncompiled Mesh
+	SMeshFace*               m_pFaces;            //!< Faces are used in mesh processing/compilation.
+
+	// Serialized data only found in a compiled Mesh (can be back-converted)
 	SMeshTangents*           m_pTangents;
 	SMeshQTangents*          m_pQTangents;
-	SMeshTexCoord*           m_pTexCoord;
-	SMeshColor*              m_pColor0;
-	SMeshColor*              m_pColor1;
 
-	int*                     m_pVertMats;
-	SVF_P3S_C4B_T2S*         m_pP3S_C4B_T2S;
+	int*                     m_pSubsetIds;        //!< Points to the subset the vertex is used in
 
 	SMeshBoneMapping_uint16* m_pBoneMapping;      //!< Bone-mapping for the final render-mesh.
 	SMeshBoneMapping_uint16* m_pExtraBoneMapping; //!< Bone indices and weights for bones 5 to 8.
 
-	int                      m_nCoorCount;  //!< Number of texture coordinates in m_pTexCoord array.
-	int                      m_streamSize[LAST_STREAM];
+	// Compacted and streamable data found in a compiled Mesh (can be back-converted)
+	Vec3f16*                 m_pPositionsF16;
+	SVF_P3H_C4B_T2H*         m_pP3H_C4B_T2H;
 
 	//! Bounding box.
 	AABB m_bbox;
@@ -955,18 +967,15 @@ public:
 		m_pIndices = NULL;
 		m_pPositions = NULL;
 		m_pPositionsF16 = NULL;
-		m_pNorms = NULL;
+		m_pNormals = NULL;
 		m_pTangents = NULL;
 		m_pQTangents = NULL;
 		m_pTexCoord = NULL;
-		m_pColor0 = NULL;
-		m_pColor1 = NULL;
-		m_pVertMats = NULL;
-		m_pP3S_C4B_T2S = NULL;
+		m_pColors = NULL;
+		m_pSubsetIds = NULL;
+		m_pP3H_C4B_T2H = NULL;
 		m_pBoneMapping = NULL;
 		m_pExtraBoneMapping = NULL;
-
-		m_nCoorCount = 0;
 
 		memset(m_streamSize, 0, sizeof(m_streamSize));
 
@@ -1002,11 +1011,15 @@ public:
 	}
 	int GetTexCoordCount() const
 	{
-		return m_nCoorCount;
+		return m_streamSize[TEXCOORDS];
 	}
 	int GetTangentCount() const
 	{
 		return m_streamSize[TANGENTS];
+	}
+	int GetNormalCount() const
+	{
+		return m_streamSize[NORMALS];
 	}
 	int GetSubSetCount() const
 	{
@@ -1028,41 +1041,29 @@ public:
 		{
 			ReallocStream(POSITIONS, nNewCount);
 			ReallocStream(POSITIONSF16, 0);
-			ReallocStream(NORMALS, nNewCount);
 
-			if (m_pColor0)
+			if (m_pNormals)
 			{
-				ReallocStream(COLORS_0, nNewCount);
+				ReallocStream(NORMALS, nNewCount);
 			}
 
-			if (m_pColor1)
+			if (m_pColors)
 			{
-				ReallocStream(COLORS_1, nNewCount);
+				ReallocStream(COLORS, nNewCount);
 			}
 
-			if (m_pVertMats)
+			if (m_pSubsetIds)
 			{
-				ReallocStream(VERT_MATS, nNewCount);
+				ReallocStream(SUBSET_IDS, nNewCount);
 			}
 		}
 	}
 
 	void SetTexCoordsCount(int nNewCount)
 	{
-		if (m_nCoorCount != nNewCount || m_nCoorCount == 0)
+		if (GetTexCoordCount() != nNewCount || GetTexCoordCount() == 0)
 		{
 			ReallocStream(TEXCOORDS, nNewCount);
-			m_nCoorCount = nNewCount;
-		}
-	}
-
-	void SetTexCoordsAndTangentsCount(int nNewCount)
-	{
-		if (m_nCoorCount != nNewCount || m_nCoorCount == 0)
-		{
-			ReallocStream(TEXCOORDS, nNewCount);
-			ReallocStream(TANGENTS, nNewCount);
-			m_nCoorCount = nNewCount;
 		}
 	}
 
@@ -1112,46 +1113,39 @@ public:
 		assert(stream >= 0 && stream < LAST_STREAM);
 		switch (stream)
 		{
+		// Unserialized geometry data maintained in an uncompiled Mesh
+		case INDICES:
+			pStream = m_pIndices;
+			nElementSize = sizeof(vtx_idx);
+			break;
 		case POSITIONS:
 			pStream = m_pPositions;
 			nElementSize = sizeof(Vec3);
 			break;
-		case POSITIONSF16:
-			pStream = m_pPositionsF16;
-			nElementSize = sizeof(Vec3f16);
-			break;
 		case NORMALS:
-			pStream = m_pNorms;
-			nElementSize = sizeof(Vec3);
-			break;
-		case VERT_MATS:
-			pStream = m_pVertMats;
-			nElementSize = sizeof(int);
-			break;
-		case FACES:
-			pStream = m_pFaces;
-			nElementSize = sizeof(SMeshFace);
-			break;
-		case TOPOLOGY_IDS:
-			pStream = m_pTopologyIds;
-			nElementSize = sizeof(int32);
+			pStream = m_pNormals;
+			nElementSize = sizeof(SMeshNormal);
 			break;
 		case TEXCOORDS:
 			pStream = m_pTexCoord;
 			nElementSize = sizeof(SMeshTexCoord);
 			break;
-		case COLORS_0:
-			pStream = m_pColor0;
+		case COLORS:
+			pStream = m_pColors;
 			nElementSize = sizeof(SMeshColor);
 			break;
-		case COLORS_1:
-			pStream = m_pColor1;
-			nElementSize = sizeof(SMeshColor);
+		case TOPOLOGY_IDS:
+			pStream = m_pTopologyIds;
+			nElementSize = sizeof(int32);
 			break;
-		case INDICES:
-			pStream = m_pIndices;
-			nElementSize = sizeof(vtx_idx);
+
+		// Temporary geometry data generated when loading an uncompiled Mesh
+		case FACES:
+			pStream = m_pFaces;
+			nElementSize = sizeof(SMeshFace);
 			break;
+
+		// Serialized data only found in a compiled Mesh (can be back-converted)
 		case TANGENTS:
 			pStream = m_pTangents;
 			nElementSize = sizeof(SMeshTangents);
@@ -1159,6 +1153,10 @@ public:
 		case QTANGENTS:
 			pStream = m_pQTangents;
 			nElementSize = sizeof(SMeshQTangents);
+			break;
+		case SUBSET_IDS:
+			pStream = m_pSubsetIds;
+			nElementSize = sizeof(int);
 			break;
 		case BONEMAPPING:
 			pStream = m_pBoneMapping;
@@ -1168,10 +1166,17 @@ public:
 			pStream = m_pExtraBoneMapping;
 			nElementSize = sizeof(SMeshBoneMapping_uint16);
 			break;
-		case P3S_C4B_T2S:
-			pStream = m_pP3S_C4B_T2S;
-			nElementSize = sizeof(SVF_P3S_C4B_T2S);
+
+		// Compacted and streamable data found in a compiled Mesh (can be back-converted)
+		case POSITIONSF16:
+			pStream = m_pPositionsF16;
+			nElementSize = sizeof(Vec3f16);
 			break;
+		case P3S_C4B_T2S:
+			pStream = m_pP3H_C4B_T2H;
+			nElementSize = sizeof(SVF_P3H_C4B_T2H);
+			break;
+
 		default:
 			// unknown stream
 			assert(0);
@@ -1641,9 +1646,9 @@ public:
 				{
 					p = m_pPositionsF16[index].ToVec3();
 				}
-				else if (m_pP3S_C4B_T2S)
+				else if (m_pP3H_C4B_T2H)
 				{
-					p = m_pP3S_C4B_T2S[index].xyz.ToVec3();
+					p = m_pP3H_C4B_T2H[index].xyz.ToVec3();
 				}
 				if (!_finite(pp->x))
 				{
@@ -1851,7 +1856,7 @@ public:
 			0U,
 			sizeof(SPipTangents),        // VSF_TANGENTS
 			sizeof(SPipQTangents),       // VSF_QTANGENTS
-			sizeof(SVF_W4B_I4S),         // VSF_HWSKIN_INFO
+			sizeof(SVF_W4B_I4U),         // VSF_HWSKIN_INFO
 			sizeof(SVF_P3F),             // VSF_VERTEX_VELOCITY
 #if ENABLE_NORMALSTREAM_SUPPORT
 			sizeof(SPipNormal),          // VSF_NORMALS
@@ -1869,7 +1874,7 @@ public:
 		{
 			if (activeStreams & (1U << i))
 			{
-				nMeshSize += ((i == VSF_GENERAL) ? sizeof(SVF_P3S_C4B_T2S) : cSizeStream[i]) * GetVertexCount();
+				nMeshSize += ((i == VSF_GENERAL) ? sizeof(SVF_P3H_C4B_T2H) : cSizeStream[i]) * GetVertexCount();
 				nMeshSize += TARGET_DEFAULT_ALIGN - (nMeshSize & (TARGET_DEFAULT_ALIGN - 1));
 			}
 		}
@@ -1886,7 +1891,7 @@ public:
 	static uint32 ApproximateRenderMeshMemoryUsage(int nVertexCount, int nIndexCount)
 	{
 		uint32 nMeshSize = 0;
-		nMeshSize += nVertexCount * sizeof(SVF_P3S_C4B_T2S);
+		nMeshSize += nVertexCount * sizeof(SVF_P3H_C4B_T2H);
 		nMeshSize += nVertexCount * sizeof(SPipTangents);
 
 		nMeshSize += nIndexCount * sizeof(vtx_idx);
@@ -1905,42 +1910,40 @@ private:
 		m_streamSize[stream] = nNewCount;
 		switch (stream)
 		{
+		// Unserialized geometry data maintained in an uncompiled Mesh
+		case INDICES:
+			m_pIndices = (vtx_idx*)pStream;
+			break;
 		case POSITIONS:
 			m_pPositions = (Vec3*)pStream;
 			break;
-		case POSITIONSF16:
-			m_pPositionsF16 = (Vec3f16*)pStream;
-			break;
 		case NORMALS:
-			m_pNorms = (SMeshNormal*)pStream;
+			m_pNormals = (SMeshNormal*)pStream;
 			break;
-		case VERT_MATS:
-			m_pVertMats = (int*)pStream;
+		case TEXCOORDS:
+			m_pTexCoord = (SMeshTexCoord*)pStream;
 			break;
-		case FACES:
-			m_pFaces = (SMeshFace*)pStream;
+		case COLORS:
+			m_pColors = (SMeshColor*)pStream;
 			break;
 		case TOPOLOGY_IDS:
 			m_pTopologyIds = (int32*)pStream;
 			break;
-		case TEXCOORDS:
-			m_pTexCoord = (SMeshTexCoord*)pStream;
-			m_nCoorCount = nNewCount;
+
+		// Temporary geometry data generated when loading an uncompiled Mesh
+		case FACES:
+			m_pFaces = (SMeshFace*)pStream;
 			break;
-		case COLORS_0:
-			m_pColor0 = (SMeshColor*)pStream;
-			break;
-		case COLORS_1:
-			m_pColor1 = (SMeshColor*)pStream;
-			break;
-		case INDICES:
-			m_pIndices = (vtx_idx*)pStream;
-			break;
+
+		// Serialized data only found in a compiled Mesh (can be back-converted)
 		case TANGENTS:
 			m_pTangents = (SMeshTangents*)pStream;
 			break;
 		case QTANGENTS:
 			m_pQTangents = (SMeshQTangents*)pStream;
+			break;
+		case SUBSET_IDS:
+			m_pSubsetIds = (int*)pStream;
 			break;
 		case BONEMAPPING:
 			m_pBoneMapping = (SMeshBoneMapping_uint16*)pStream;
@@ -1948,10 +1951,15 @@ private:
 		case EXTRABONEMAPPING:
 			m_pExtraBoneMapping = (SMeshBoneMapping_uint16*)pStream;
 			break;
-		case P3S_C4B_T2S:
-			m_pP3S_C4B_T2S = (SVF_P3S_C4B_T2S*)pStream;
-			m_nCoorCount = nNewCount;
+
+		// Compacted and streamable data found in a compiled Mesh (can be back-converted)
+		case POSITIONSF16:
+			m_pPositionsF16 = (Vec3f16*)pStream;
 			break;
+		case P3S_C4B_T2S:
+			m_pP3H_C4B_T2H = (SVF_P3H_C4B_T2H*)pStream;
+			break;
+
 		default:
 			// unknown stream
 			assert(0);
@@ -2024,6 +2032,12 @@ struct IIndexedMesh
 
 	//! Reallocates tangents. Calling this function invalidates SMeshDescription pointers.
 	virtual void SetTangentCount(int nNewCount) = 0;
+
+	//! Return number of allocated Normals.
+	virtual int GetNormalCount() const = 0;
+
+	//! Reallocates Normals. Calling this function invalidates SMeshDescription pointers.
+	virtual void SetNormalCount(int nNewCount) = 0;
 
 	//! Get number of indices in the mesh.
 	virtual int GetIndexCount() const = 0;

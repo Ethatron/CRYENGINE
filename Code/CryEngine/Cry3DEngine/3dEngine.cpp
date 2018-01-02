@@ -2593,7 +2593,7 @@ IStatObj* C3DEngine::LoadDesignerObject(int nVersion, const char* szBinaryStream
 		SMeshTexCoord* const texcoords = pMesh->GetMesh()->GetStreamPtr<SMeshTexCoord>(CMesh::TEXCOORDS);
 
 		nBufferPos = ReadFromBuffer(szBinaryStream, size, nBufferPos, positions, sizeof(Vec3) * nPositionCount);
-		nBufferPos = ReadFromBuffer(szBinaryStream, size, nBufferPos, normals, sizeof(Vec3) * nPositionCount);
+		nBufferPos = ReadFromBuffer(szBinaryStream, size, nBufferPos, normals, sizeof(SMeshNormal) * nPositionCount);
 		nBufferPos = ReadFromBuffer(szBinaryStream, size, nBufferPos, texcoords, sizeof(SMeshTexCoord) * nTexCoordCount);
 		if (nVersion == 0)
 		{

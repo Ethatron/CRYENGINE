@@ -273,7 +273,7 @@ void CBreakablePlane::FillVertexData(CMesh* pMesh, int ivtx, const Vec2& pos, in
 	assert(pMesh->m_pPositionsF16 == 0);
 
 	pMesh->m_pPositions[ivtx] = m_R * Vec3(pos.x, pos.y, m_z[iside]) + m_center;
-	pMesh->m_pNorms[ivtx] = SMeshNormal(m_R * Vec3(0, 0, iside * 2 - 1.f));
+	pMesh->m_pNormals[ivtx] = SMeshNormal(m_R * Vec3(0, 0, iside * 2 - 1.f));
 	if (m_pGeom)
 	{
 		geom_world_data gwd[2];
@@ -289,9 +289,9 @@ void CBreakablePlane::FillVertexData(CMesh* pMesh, int ivtx, const Vec2& pos, in
 			{
 				pMesh->m_pPositions[ivtx] += m_R.GetColumn(2) * (m_R.GetColumn(2) * (pcont[ncont - 1].pt - pMesh->m_pPositions[ivtx]));
 
-				Vec3 n = pMesh->m_pNorms[ivtx].GetN();
+				Vec3 n = pMesh->m_pNormals[ivtx].GetN();
 				qnRot = Quat::CreateRotationV0V1(n, pcont[ncont - 1].n);
-				pMesh->m_pNorms[ivtx] = SMeshNormal(pcont[ncont - 1].n);
+				pMesh->m_pNormals[ivtx] = SMeshNormal(pcont[ncont - 1].n);
 			}
 		} // lock
 	}
@@ -363,8 +363,8 @@ IStatObj* CBreakablePlane::CreateFlatStatObj(int*& pIdx, Vec2* pt, Vec2* bounds,
 	if (bUseEdgeAlpha)
 	{
 		pIdxMesh->SetColorCount(nOutVtx);
-		memset(pMesh->m_pColor0, 255, nOutVtx * sizeof(pMesh->m_pColor0[0]));
-		pColor = pMesh->m_pColor0;
+		memset(pMesh->m_pColors, 255, nOutVtx * sizeof(pMesh->m_pColors[0]));
+		pColor = pMesh->m_pColors;
 		clrmask = -1;
 	}
 	else
@@ -434,7 +434,7 @@ IStatObj* CBreakablePlane::CreateFlatStatObj(int*& pIdx, Vec2* pt, Vec2* bounds,
 			pMesh->m_pPositions[nVtx * 2 + i] = pMesh->m_pPositions[j = pVtxMap[pCntVtxList[i >> 1]]];
 			pMesh->m_pTexCoord[nVtx * 2 + i] = pMesh->m_pTexCoord[j];
 			pMesh->m_pTangents[(nVtx + nCntVtx) * 2 + i] = pMesh->m_pTangents[nVtx * 2 + i] = SMeshTangents(Tangent, n, -1);
-			pMesh->m_pNorms[(nVtx + nCntVtx) * 2 + i] = pMesh->m_pNorms[nVtx * 2 + i] = SMeshNormal(Tangent.Cross(n));
+			pMesh->m_pNormals[(nVtx + nCntVtx) * 2 + i] = pMesh->m_pNormals[nVtx * 2 + i] = SMeshNormal(Tangent.Cross(n));
 			pColor[(nVtx + nCntVtx) * 2 + i & clrmask] = pColor[nVtx * 2 + i & clrmask] = pColor[j & clrmask];
 		}
 		for (i = 0; i < nCntVtx * 2; i++)
@@ -749,7 +749,7 @@ void         CBreakablePlane::ExtractMeshIsland(const SExtractMeshIslandIn& in, 
 				pMesh->m_pPositions[i] = pVtx[i + ivtxMin];
 				pMesh->m_pTexCoord[i] = SMeshTexCoord(pTex[i + ivtxMin]);
 				pMesh->m_pTangents[i] = SMeshTangents(pTangs[i + ivtxMin]);
-				pMesh->m_pNorms[i] = SMeshNormal(pMesh->m_pTangents[i].GetN());
+				pMesh->m_pNormals[i] = SMeshNormal(pMesh->m_pTangents[i].GetN());
 			}
 
 			pIdxMesh->SetSubSetCount(1);

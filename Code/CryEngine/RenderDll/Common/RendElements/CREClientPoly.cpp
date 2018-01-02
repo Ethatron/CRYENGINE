@@ -80,7 +80,7 @@ void CREClientPoly::mfPrepare(bool bCheckOverflow)
 	CShader* ef = rd->m_RP.m_pShader;
 	int i, n;
 
-	if (rd->m_RP.m_CurVFormat == EDefaultInputLayouts::P3S_C4B_T2S)
+	if (rd->m_RP.m_CurVFormat == EDefaultInputLayouts::P3H_C4B_T2H)
 		rd->m_RP.m_CurVFormat = EDefaultInputLayouts::P3F_C4B_T2F;
 
 	rd->FX_StartMerging();

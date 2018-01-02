@@ -2088,7 +2088,7 @@ struct IRenderer//: public IRendererCallbackServer
 	  void* CustomData = NULL,
 	  bool bOnlyVideoBuffer = false,
 	  bool bPrecache = true,
-	  const SPipTangents* pTangents = NULL, bool bLockForThreadAcc = false, Vec3* pNormals = NULL) = 0;
+	  const SPipTangents* pTangents = NULL, bool bLockForThreadAcc = false, SPipNormal* pNormals = NULL) = 0;
 
 	virtual int  GetFrameID(bool bIncludeRecursiveCalls = true) = 0;
 

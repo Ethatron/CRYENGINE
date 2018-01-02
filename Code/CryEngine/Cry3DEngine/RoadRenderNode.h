@@ -37,7 +37,7 @@ public:
 
 	struct SDynamicData
 	{
-		PodArray<SVF_P3F_C4B_T2S>        vertices;
+		PodArray<SVF_P3F_C4B_T2H>        vertices;
 		PodArray<vtx_idx>                indices;
 		PodArray<SPipTangents>           tangents;
 
@@ -111,7 +111,7 @@ public:
 	static PodArray<vtx_idx>         s_tempIndices;
 
 	static PodArray<SPipTangents>    s_tempTangents;
-	static PodArray<SVF_P3F_C4B_T2S> s_tempVertices;
+	static PodArray<SVF_P3F_C4B_T2H> s_tempVertices;
 
 	static CPolygonClipContext       s_tmpClipContext;
 

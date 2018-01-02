@@ -929,7 +929,7 @@ void COctreeNode::LoadSingleObject(byte*& pPtr, std::vector<IStatObj*>* pStatObj
 		SRoadChunk* pChunk = StepData<SRoadChunk>(pPtr, eEndian);
 
 		// Make sure we always step through the data, even if we return below
-		SVF_P3F_C4B_T2S* pVertices = StepData<SVF_P3F_C4B_T2S>(pPtr, pChunk->m_roadData.numVertices, eEndian);
+		SVF_P3F_C4B_T2H* pVertices = StepData<SVF_P3F_C4B_T2H>(pPtr, pChunk->m_roadData.numVertices, eEndian);
 		uint32* pIndices = StepData<uint32>(pPtr, pChunk->m_roadData.numIndices, eEndian);
 		SPipTangents* pTangents = StepData<SPipTangents>(pPtr, pChunk->m_roadData.numTangents, eEndian);
 

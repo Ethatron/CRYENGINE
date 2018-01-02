@@ -1237,8 +1237,8 @@ void CAttachmentSKIN::SoftwareSkinningDQ_VS_Emulator( CModelMesh* pModelMesh, Ma
 			arrSkinned[e]=1;
 			Vec3		hwPosition	= *(Vec3*)(pPositions + e * nPositionStride) + pModelMesh->m_vRenderMeshOffset;
 			SMeshQTangents	hwQTangent	= *(SMeshQTangents*)(pQTangents + e * nQTangentStride);
-			uint16*	hwIndices   = ((SVF_W4B_I4S*)(pSkinningInfo + e*nSkinningStride))->indices;
-			ColorB	hwWeights		= *(ColorB*)&((SVF_W4B_I4S*)(pSkinningInfo + e*nSkinningStride))->weights;
+			uint16*	hwIndices   = ((SVF_W4B_I4U*)(pSkinningInfo + e*nSkinningStride))->indices;
+			ColorB	hwWeights		= *(ColorB*)&((SVF_W4B_I4U*)(pSkinningInfo + e*nSkinningStride))->weights;
 
 			//---------------------------------------------------------------------
 			//---     this is CPU emulation of Dual-Quat skinning              ---

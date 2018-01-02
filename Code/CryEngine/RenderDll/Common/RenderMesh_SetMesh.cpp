@@ -76,28 +76,32 @@ struct StreamCompactor<VSF_GENERAL, Size>
 		return StreamCompactorDetail::CompactPositions<T>(pVBuff, data, mesh, posOffset, beg, end);
 	}
 
-	static void CompactNormals(SVF_P3S_N4B_C4B_T2S* pVBuff, SSetMeshIntData& data, CMesh& mesh, uint32 beg, uint32 end)
+	static void CompactNormals(SVF_P3H_C4B_T2H_N4C* pVBuff, SSetMeshIntData& data, CMesh& mesh, uint32 beg, uint32 end)
 	{
-		if (mesh.m_pNorms)
+		if (mesh.m_pNormals)
 			for (size_t i = 0; i < end; ++i)
 			{
-				Vec3 n = mesh.m_pNorms[beg + i].GetN();
+				Vec3 n = mesh.m_pNormals[beg + i].GetN();
 
-				pVBuff[i].normal.bcolor[0] = (byte)(n[0] * 127.5f + 128.0f);
-				pVBuff[i].normal.bcolor[1] = (byte)(n[1] * 127.5f + 128.0f);
-				pVBuff[i].normal.bcolor[2] = (byte)(n[2] * 127.5f + 128.0f);
+				pVBuff[i].normal.PutN(n, 0);
 
 				SwapEndian(pVBuff[i].normal.dcolor);
 			}
 	}
 
 	template<typename T>
-	static void CompactColors0(T* pVBuff, SSetMeshIntData& data, CMesh& mesh, uint32 beg, uint32 end)
+	static void CompactUVs(T* pVBuff, SSetMeshIntData& data, CMesh& mesh, uint32 beg, uint32 end)
 	{
-		if (mesh.m_pColor0)
+		StreamCompactorDetail::CompactUVs<T>(pVBuff, data, mesh, beg, end);
+	}
+
+	template<typename T>
+	static void CompactColors(T* pVBuff, SSetMeshIntData& data, CMesh& mesh, uint32 beg, uint32 end)
+	{
+		if (mesh.m_pColors)
 			for (size_t i = 0; i < end; ++i)
 			{
-				ColorB c = mesh.m_pColor0[beg + i].GetRGBA();
+				ColorB c = mesh.m_pColors[beg + i].GetRGBA();
 
 				pVBuff[i].color.bcolor[0] = c.b;
 				pVBuff[i].color.bcolor[1] = c.g;
@@ -109,23 +113,6 @@ struct StreamCompactor<VSF_GENERAL, Size>
 		else
 			for (size_t i = 0; i < end; ++i)
 				pVBuff[i].color.dcolor = ~0;
-	}
-
-	static void CompactColors1(SVF_P2S_N4B_C4B_T1F* pVBuff, SSetMeshIntData& data, CMesh& mesh, uint32 beg, uint32 end)
-	{
-		if (mesh.m_pColor1)
-			for (size_t i = 0; i < end; ++i)
-			{
-				ColorB c = mesh.m_pColor1[beg + i].GetRGBA();
-
-				pVBuff[i].normal.bcolor[3] = c.b;
-			}
-	}
-
-	template<typename T>
-	static void CompactUVs(T* pVBuff, SSetMeshIntData& data, CMesh& mesh, uint32 beg, uint32 end)
-	{
-		StreamCompactorDetail::CompactUVs<T>(pVBuff, data, mesh, beg, end);
 	}
 
 	static uint32 Compact(uint8 (&buffer)[Size], SSetMeshIntData& data, CMesh& mesh, uint32 beg, uint32 end)
@@ -143,26 +130,26 @@ struct StreamCompactor<VSF_GENERAL, Size>
 				amount = min((uint32)(end - beg), (uint32)(Size / sizeof(pVBuff[0])));
 
 				CompactPositions(pVBuff, data, mesh, posOffset, beg, amount);
+				CompactColors(pVBuff, data, mesh, beg, amount);
 				CompactUVs(pVBuff, data, mesh, beg, amount);
-				CompactColors0(pVBuff, data, mesh, beg, amount);
 
 				transfer_writecombined(&data.m_pVBuff[beg * sizeof(pVBuff[0])], &buffer[dstPad], amount * sizeof(pVBuff[0]));
 			}
 			else
 			{
-				size_t dstPad = (size_t)&data.m_pVBuff[beg * sizeof(SVF_P3S_C4B_T2S)] & (TRANSFER_ALIGNMENT - 1);
-				SVF_P3S_C4B_T2S* pVBuff = alias_cast<SVF_P3S_C4B_T2S*>(&buffer[dstPad]);
+				size_t dstPad = (size_t)&data.m_pVBuff[beg * sizeof(SVF_P3H_C4B_T2H)] & (TRANSFER_ALIGNMENT - 1);
+				SVF_P3H_C4B_T2H* pVBuff = alias_cast<SVF_P3H_C4B_T2H*>(&buffer[dstPad]);
 				amount = min((uint32)(end - beg), (uint32)(Size / sizeof(pVBuff[0])));
 
-				if (mesh.m_pP3S_C4B_T2S)
+				if (mesh.m_pP3H_C4B_T2H)
 				{
-					memcpy(pVBuff, &mesh.m_pP3S_C4B_T2S[beg], sizeof(pVBuff[0]) * amount);
+					memcpy(pVBuff, &mesh.m_pP3H_C4B_T2H[beg], sizeof(pVBuff[0]) * amount);
 				}
 				else
 				{
 					CompactPositions(pVBuff, data, mesh, posOffset, beg, amount);
+					CompactColors(pVBuff, data, mesh, beg, amount);
 					CompactUVs(pVBuff, data, mesh, beg, amount);
-					CompactColors0(pVBuff, data, mesh, beg, amount);
 				}
 
 				transfer_writecombined(&data.m_pVBuff[beg * sizeof(pVBuff[0])], &buffer[dstPad], amount * sizeof(pVBuff[0]));
@@ -226,14 +213,18 @@ struct StreamCompactor<VSF_NORMALS, Size>
 {
 	static uint32 Compact(uint8 (&buffer)[Size], SSetMeshIntData& data, CMesh& mesh, uint32 beg, uint32 end)
 	{
-		if (mesh.m_pNorms == NULL || data.m_pNormalsBuff == NULL)
+		if (mesh.m_pNormals == NULL || data.m_pNormalsBuff == NULL)
 			return end;
 
 		uint32 dstPad = 0;
 
-		uint32 amount = min((uint32)(end - beg), (uint32)(Size / sizeof(data.m_pNormalsBuff[0])));
-		memcpy(&buffer[dstPad], &mesh.m_pNorms[beg], amount * sizeof(data.m_pNormalsBuff[0]));
-		transfer_writecombined(&data.m_pNormalsBuff[beg], &buffer[dstPad], amount * sizeof(data.m_pNormalsBuff[0]));
+		SPipNormal* pNBuff = alias_cast<SPipNormal*>(&buffer[dstPad]);
+		uint32 amount = min((uint32)(end - beg), (uint32)(Size / sizeof(pNBuff[0])));
+
+		for (size_t i = 0; i < amount; ++i)
+			mesh.m_pNormals[beg + i].ExportTo(pNBuff[i]);
+
+		transfer_writecombined(&data.m_pNormalsBuff[beg], &buffer[dstPad], amount * sizeof(pNBuff[0]));
 
 		return amount;
 	}
@@ -288,12 +279,14 @@ void CRenderMesh::SetMesh_IntImpl(SSetMeshIntData data)
 		;
 	for (uint32 iter = 0; iter < data.m_nVerts; iter += CompactStream<VSF_QTANGENTS>(stagingBuffer, data, mesh, iter, data.m_nVerts))
 		;
+//	for (uint32 iter = 0; iter < data.m_nVerts; iter += CompactStream<VSF_HWSKIN_INFO>(stagingBuffer, data, mesh, iter, data.m_nVerts))
+//		;
+	for (uint32 iter = 0; iter < data.m_nVerts; iter += CompactStream<VSF_VERTEX_VELOCITY>(stagingBuffer, data, mesh, iter, data.m_nVerts))
+		;
 #if ENABLE_NORMALSTREAM_SUPPORT
 	for (uint32 iter = 0; iter < data.m_nVerts; iter += CompactStream<VSF_NORMALS>(stagingBuffer, data, mesh, iter, data.m_nVerts))
 		;
 #endif
-	for (uint32 iter = 0; iter < data.m_nVerts; iter += CompactStream<VSF_VERTEX_VELOCITY>(stagingBuffer, data, mesh, iter, data.m_nVerts))
-		;
 	for (uint32 iter = 0; iter < data.m_nInds; iter += CompactIndices(stagingBuffer, data, mesh, iter, data.m_nInds))
 		;
 }

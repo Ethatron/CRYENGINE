@@ -431,8 +431,8 @@ public:
 
 	void                UpdateRenderMesh(struct CStripsInfo* pArrayInfo, bool bUpdateVertices);
 	void                BuildVertices(int step, bool bSafetyBorder);
-	void                SetVertexSurfaceType(int x, int y, int nStep, CTerrain* pTerrain, const int nSID, SVF_P2S_N4B_C4B_T1F &vert);
-	void                SetVertexNormal(int x, int y, const int iLookupRadius, CTerrain* pTerrain, const int nTerrainSize, const int nSID, SVF_P2S_N4B_C4B_T1F &vert, Vec3 * pTerrainNorm = nullptr);
+	void                SetVertexSurfaceType(int x, int y, int nStep, CTerrain* pTerrain, const int nSID, SVF_P2H_C4B_T1F_N4C &vert);
+	void                SetVertexNormal(int x, int y, const int iLookupRadius, CTerrain* pTerrain, const int nTerrainSize, const int nSID, SVF_P2H_C4B_T1F_N4C &vert, Vec3 * pTerrainNorm = nullptr);
 	void                AppendTrianglesFromObjects(const int nOriginX, const int nOriginY, CTerrain* pTerrain, const int nSID, const int nStep, const int nTerrainSize);
 
 	int                 GetMML(int dist, int mmMin, int mmMax);

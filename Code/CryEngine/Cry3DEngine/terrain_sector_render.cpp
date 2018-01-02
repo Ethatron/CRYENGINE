@@ -146,7 +146,7 @@ public:
 	// for Update Indices
 	CRY_ALIGN(128) CStripsInfo m_StripsInfo;
 	// for update vectices
-	CRY_ALIGN(128) CTerrainTempDataStorage<SVF_P2S_N4B_C4B_T1F> m_lstTmpVertArray;
+	CRY_ALIGN(128) CTerrainTempDataStorage<SVF_P2H_C4B_T1F_N4C> m_lstTmpVertArray;
 };
 
 CTerrainUpdateDispatcher::CTerrainUpdateDispatcher()
@@ -214,7 +214,7 @@ bool CTerrainUpdateDispatcher::AddJob(CTerrainNode* pNode, bool executeAsJob, co
 	allocSize += sizeof(vtx_idx) * nNumIdx;
 	allocSize += alignPad;
 
-	allocSize += sizeof(SVF_P2S_N4B_C4B_T1F) * nNumVerts;
+	allocSize += sizeof(SVF_P2H_C4B_T1F_N4C) * nNumVerts;
 
 	uint8* pTempData = (uint8*)m_pHeap->Memalign(__alignof(CUpdateTerrainTempData), allocSize, ""); // /*NOTE: Disabled due aliasing issues in the allocator with SNC compiler */m_TempStorage.Allocate<uint8*>(allocSize, __alignof(CUpdateTerrainTempData));
 	if (pTempData)
@@ -227,7 +227,7 @@ bool CTerrainUpdateDispatcher::AddJob(CTerrainNode* pNode, bool executeAsJob, co
 		pTempData += sizeof(vtx_idx) * nNumIdx;
 		pTempData = (uint8*)((reinterpret_cast<uintptr_t>(pTempData) + alignPad) & ~uintptr_t(alignPad));
 
-		pUpdateTerrainTempData->m_lstTmpVertArray.PreAllocate(reinterpret_cast<SVF_P2S_N4B_C4B_T1F*>(pTempData), nNumVerts);
+		pUpdateTerrainTempData->m_lstTmpVertArray.PreAllocate(reinterpret_cast<SVF_P2H_C4B_T1F_N4C*>(pTempData), nNumVerts);
 
 		pNode->m_pUpdateTerrainTempData = pUpdateTerrainTempData;
 
@@ -614,7 +614,7 @@ void CTerrainNode::UpdateRenderMesh(CStripsInfo* pArrayInfo, bool bUpdateVertice
 		gEnv->pRenderer->EF_Query(EFQ_MultiGPUEnabled, bMultiGPU);
 
 		pRenderMesh = GetRenderer()->CreateRenderMeshInitialized(
-		  m_pUpdateTerrainTempData->m_lstTmpVertArray.GetElements(), m_pUpdateTerrainTempData->m_lstTmpVertArray.Count(), EDefaultInputLayouts::P2S_N4B_C4B_T1F,
+		  m_pUpdateTerrainTempData->m_lstTmpVertArray.GetElements(), m_pUpdateTerrainTempData->m_lstTmpVertArray.Count(), EDefaultInputLayouts::P2H_C4B_T1F_N4C,
 		  pArrayInfo->idx_array.GetElements(), pArrayInfo->idx_array.Count(),
 		  prtTriangleList, "TerrainSector", "TerrainSector", eRMType, 1,
 		  m_nTexSet.nTex0, NULL, NULL, false, true, lstTangents.Count() ? lstTangents.GetElements() : NULL);
@@ -714,9 +714,9 @@ void CTerrainNode::BuildVertices(int nStep, bool bSafetyBorder)
 			int _y = CLAMP(y, nOriginY, nOriginY + nSectorSize);
 			float _z = pTerrain->GetZ(_x, _y, nSID);
 
-			SVF_P2S_N4B_C4B_T1F vert;
+			SVF_P2H_C4B_T1F_N4C vert;
 
-			vert.xy = CryHalf2((float)(_x - nOriginX), (float)(_y - nOriginY));
+			vert.xy = Vec2f16((float)(_x - nOriginX), (float)(_y - nOriginY));
 			vert.z = _z;
 
 			// set terrain surface normal
@@ -1165,12 +1165,13 @@ void CTerrainNode::GenerateIndicesForAllSurfaces(IRenderMesh* pRM, bool bOnlyBor
 			return;
 
 		pPosPtr = reinterpret_cast<byte*>(pUpdateTerrainTempData->m_lstTmpVertArray.GetElements());
-		uint32 nColorOffset = offsetof(SVF_P2S_N4B_C4B_T1F, color.dcolor);
-		nColorStride = sizeof(SVF_P2S_N4B_C4B_T1F);
+
+		uint32 nColorOffset = offsetof(SVF_P2H_C4B_T1F_N4C, color);
+		nColorStride = sizeof(SVF_P2H_C4B_T1F_N4C);
 		pColor = pPosPtr + nColorOffset;
 
-		nNormStride = sizeof(SVF_P2S_N4B_C4B_T1F);
-		uint32 nNormOffset = offsetof(SVF_P2S_N4B_C4B_T1F, normal);
+		uint32 nNormOffset = offsetof(SVF_P2H_C4B_T1F_N4C, normal);
+		nNormStride = sizeof(SVF_P2H_C4B_T1F_N4C);
 		pNormB = pPosPtr + nNormOffset;
 	}
 	else
@@ -1242,22 +1243,22 @@ void CTerrainNode::GenerateIndicesForAllSurfaces(IRenderMesh* pRM, bool bOnlyBor
 			int lstProjIds[3];
 			int idxProjIds(0);
 
-			byte* pNorm;
+			SCol* pNorm;
 			Vec3 vNorm;
 
 			// if there are 3d materials - analyze normals
 			if (arrMat3DFlag[nVertSurfId0])
 			{
-				pNorm = &pNormB[arrTriangle[0] * nNormStride];
-				vNorm.Set(((float)pNorm[0] - 127.5f), ((float)pNorm[1] - 127.5f), ((float)pNorm[2] - 127.5f));
+				pNorm = reinterpret_cast<SCol*>(&pNormB[arrTriangle[0] * nNormStride]);
+				vNorm = pNorm->GetN();
 				int nProjId0 = GetVecProjectId(vNorm);
 				lstProjIds[idxProjIds++] = nProjId0;
 			}
 
 			if (arrMat3DFlag[nVertSurfId1])
 			{
-				pNorm = &pNormB[arrTriangle[1] * nNormStride];
-				vNorm.Set(((float)pNorm[0] - 127.5f), ((float)pNorm[1] - 127.5f), ((float)pNorm[2] - 127.5f));
+				pNorm = reinterpret_cast<SCol*>(&pNormB[arrTriangle[1] * nNormStride]);
+				vNorm = pNorm->GetN();
 				int nProjId1 = GetVecProjectId(vNorm);
 				if (idxProjIds == 0 || lstProjIds[0] != nProjId1)
 					lstProjIds[idxProjIds++] = nProjId1;
@@ -1265,8 +1266,8 @@ void CTerrainNode::GenerateIndicesForAllSurfaces(IRenderMesh* pRM, bool bOnlyBor
 
 			if (arrMat3DFlag[nVertSurfId2])
 			{
-				pNorm = &pNormB[arrTriangle[2] * nNormStride];
-				vNorm.Set(((float)pNorm[0] - 127.5f), ((float)pNorm[1] - 127.5f), ((float)pNorm[2] - 127.5f));
+				pNorm = reinterpret_cast<SCol*>(&pNormB[arrTriangle[2] * nNormStride]);
+				vNorm = pNorm->GetN();
 				int nProjId2 = GetVecProjectId(vNorm);
 				if ((idxProjIds < 2 || lstProjIds[1] != nProjId2) &&
 				    (idxProjIds < 1 || lstProjIds[0] != nProjId2))
@@ -1328,7 +1329,7 @@ void CTerrainNode::UpdateSurfaceRenderMeshes(const _smart_ptr<IRenderMesh> pSrcR
 			eRMType = eRMT_Dynamic;
 
 		pMatRM = GetRenderer()->CreateRenderMeshInitialized(
-		  NULL, 0, EDefaultInputLayouts::P2S_N4B_C4B_T1F, NULL, 0,
+		  NULL, 0, EDefaultInputLayouts::P2H_C4B_T1F_N4C, NULL, 0,
 		  prtTriangleList, szComment, szComment, eRMType, 1, 0, NULL, NULL, false, false);
 	}
 
@@ -1474,26 +1475,23 @@ _smart_ptr<IRenderMesh> CTerrainNode::GetSharedRenderMesh()
 	int nDim = 32;
 	int nBorder = 1;
 
-	SVF_P2S_N4B_C4B_T1F vert;
+	SVF_P2H_C4B_T1F_N4C vert;
 	ZeroStruct(vert);
 
-	vert.normal.bcolor[0] = 128l;
-	vert.normal.bcolor[1] = 128l;
-	vert.normal.bcolor[2] = 255l;
-	vert.normal.bcolor[3] = 255l;
+	vert.normal.PutN(Vec3(0.0f, 0.0f, 1.0f), -1);
 
 	vert.color.bcolor[0] = 255l;
 	vert.color.bcolor[1] = 0l;
 	vert.color.bcolor[2] = 255l;
 	vert.color.bcolor[3] = 255l;
 
-	PodArray<SVF_P2S_N4B_C4B_T1F> arrVertices;
+	PodArray<SVF_P2H_C4B_T1F_N4C> arrVertices;
 
 	for (int x = -nBorder; x <= (nDim + nBorder); x++)
 	{
 		for (int y = -nBorder; y <= (nDim + nBorder); y++)
 		{
-			vert.xy = CryHalf2(SATURATE(float(x)/float(nDim)), SATURATE(float(y) / float(nDim)));
+			vert.xy = Vec2f16(SATURATE(float(x)/float(nDim)), SATURATE(float(y) / float(nDim)));
 
 			if(x<0 || y<0 || x>nDim || y>nDim)
 				vert.z = -0.1f;
@@ -1525,7 +1523,7 @@ _smart_ptr<IRenderMesh> CTerrainNode::GetSharedRenderMesh()
 	m_pTerrain->m_pSharedRenderMesh = GetRenderer()->CreateRenderMeshInitialized(
 		arrVertices.GetElements(),
 		arrVertices.Count(),
-		EDefaultInputLayouts::P2S_N4B_C4B_T1F,
+		EDefaultInputLayouts::P2H_C4B_T1F_N4C,
 		arrIndices.GetElements(),
 		arrIndices.Count(),
 		prtTriangleList,
@@ -1624,7 +1622,7 @@ void CTerrainNode::AppendTrianglesFromObjects(const int nOriginX, const int nOri
 						int lastIndex = pChunk->nFirstIndexId + pChunk->nNumIndices;
 						for (int i = pChunk->nFirstIndexId; i < lastIndex; i += 3)
 						{
-							if (m_pUpdateTerrainTempData->m_lstTmpVertArray.Count() + 3 > m_pUpdateTerrainTempData->m_lstTmpVertArray.MemorySize() / (int)sizeof(SVF_P2S_N4B_C4B_T1F))
+							if (m_pUpdateTerrainTempData->m_lstTmpVertArray.Count() + 3 > m_pUpdateTerrainTempData->m_lstTmpVertArray.MemorySize() / (int)sizeof(SVF_P2H_C4B_T1F_N4C))
 							{
 								break;
 							}
@@ -1667,9 +1665,9 @@ void CTerrainNode::AppendTrianglesFromObjects(const int nOriginX, const int nOri
 
 								for (int v = 0; v < 3; v++)
 								{
-									SVF_P2S_N4B_C4B_T1F vert;
+									SVF_P2H_C4B_T1F_N4C vert;
 
-									vert.xy = CryHalf2((float)(vPosWS[v].x - nOriginX), (float)(vPosWS[v].y - nOriginY));
+									vert.xy = Vec2f16((float)(vPosWS[v].x - nOriginX), (float)(vPosWS[v].y - nOriginY));
 									vert.z = vPosWS[v].z;
 
 									int x = (int)(vPosWS[v].x + fUnitSize2);
@@ -1685,7 +1683,7 @@ void CTerrainNode::AppendTrianglesFromObjects(const int nOriginX, const int nOri
 									{
 										vtx_idx nId = rHashIndices[nElem];
 
-										SVF_P2S_N4B_C4B_T1F & vertCached = *(m_pUpdateTerrainTempData->m_lstTmpVertArray.GetElements() + nId);
+										SVF_P2H_C4B_T1F_N4C & vertCached = *(m_pUpdateTerrainTempData->m_lstTmpVertArray.GetElements() + nId);
 
 										if (IsEquivalent(vertCached.xy.x, vert.xy.x) && IsEquivalent(vertCached.xy.y, vert.xy.y) && IsEquivalent(vertCached.z, vert.z, 0.1f))
 										{
@@ -1703,10 +1701,9 @@ void CTerrainNode::AppendTrianglesFromObjects(const int nOriginX, const int nOri
 										// use terrain normal near the ground
 										float fLerp = SATURATE((vPosWS[v].z - fElev[v]) * 2.f);
 										Vec3 vNorm = Vec3::CreateLerp(vTerrainNorm, vNormWS[v], fLerp);
-										vert.normal.bcolor[0] = (byte)(vNorm[0] * 127.5f + 128.0f);
-										vert.normal.bcolor[1] = (byte)(vNorm[1] * 127.5f + 128.0f);
-										vert.normal.bcolor[2] = (byte)(vNorm[2] * 127.5f + 128.0f);
-										vert.normal.bcolor[3] = 0;
+
+										// TODO: This is not a normal vector anymore. Intended?
+										vert.normal.PutN(vNorm, 0);
 
 										// set terrain surface type
 										SetVertexSurfaceType(x, y, nStep, pTerrain, nSID, vert);
@@ -1731,7 +1728,7 @@ void CTerrainNode::AppendTrianglesFromObjects(const int nOriginX, const int nOri
 	}
 }
 
-void CTerrainNode::SetVertexNormal(int x, int y, const int iLookupRadius, CTerrain* pTerrain, const int nTerrainSize, const int nSID, SVF_P2S_N4B_C4B_T1F &vert, Vec3 * pTerrainNorm /*= nullptr*/)
+void CTerrainNode::SetVertexNormal(int x, int y, const int iLookupRadius, CTerrain* pTerrain, const int nTerrainSize, const int nSID, SVF_P2H_C4B_T1F_N4C &vert, Vec3 * pTerrainNorm /*= nullptr*/)
 {
 #ifdef SEG_WORLD
 	bool bOutOfBound = (x + iLookupRadius) >= nTerrainSize || x <= iLookupRadius;
@@ -1761,14 +1758,11 @@ void CTerrainNode::SetVertexNormal(int x, int y, const int iLookupRadius, CTerra
 		*pTerrainNorm = vNorm;
 	}
 
-	vert.normal.bcolor[0] = (byte)(vNorm[0] * 127.5f + 128.0f);
-	vert.normal.bcolor[1] = (byte)(vNorm[1] * 127.5f + 128.0f);
-	vert.normal.bcolor[2] = (byte)(vNorm[2] * 127.5f + 128.0f);
-	vert.normal.bcolor[3] = 255;
-	SwapEndian(vert.normal.dcolor, eLittleEndian);
+	vert.normal.PutN(vNorm, -1);
+	SwapEndian(vert.normal.icolor, eLittleEndian);
 }
 
-void CTerrainNode::SetVertexSurfaceType(int x, int y, int nStep, CTerrain* pTerrain, const int nSID, SVF_P2S_N4B_C4B_T1F &vert)
+void CTerrainNode::SetVertexSurfaceType(int x, int y, int nStep, CTerrain* pTerrain, const int nSID, SVF_P2H_C4B_T1F_N4C &vert)
 {
 	uint8 ucSurfaceTypeID = pTerrain->GetSurfaceTypeID(x, y, nSID);
 	if (ucSurfaceTypeID == SRangeInfo::e_hole)

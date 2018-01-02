@@ -37,8 +37,8 @@ public:
 		meshDesc.m_pFaces = m_pFaces;
 		meshDesc.m_pVerts = m_pPositions;
 		meshDesc.m_pVertsF16 = m_pPositionsF16;
-		meshDesc.m_pNorms = m_pNorms;
-		meshDesc.m_pColor = m_pColor0;
+		meshDesc.m_pNorms = m_pNormals;
+		meshDesc.m_pColor = m_pColors;
 		meshDesc.m_pTexCoord = m_pTexCoord;
 		meshDesc.m_pIndices = m_pIndices;
 		meshDesc.m_nFaceCount = GetFaceCount();
@@ -84,7 +84,7 @@ public:
 
 	virtual void SetColorCount(int nNewCount)
 	{
-		CMesh::ReallocStream(COLORS_0, nNewCount);
+		CMesh::ReallocStream(COLORS, nNewCount);
 	}
 
 	virtual int GetTexCoordCount() const
@@ -107,9 +107,14 @@ public:
 		CMesh::ReallocStream(TANGENTS, nNewCount);
 	}
 
-	virtual void SetTexCoordsAndTangentsCount(int nNewCount)
+	virtual int GetNormalCount() const
 	{
-		CMesh::SetTexCoordsAndTangentsCount(nNewCount);
+		return CMesh::GetNormalCount();
+	}
+
+	virtual void SetNormalCount(int nNewCount)
+	{
+		CMesh::ReallocStream(NORMALS, nNewCount);
 	}
 
 	virtual int GetIndexCount() const

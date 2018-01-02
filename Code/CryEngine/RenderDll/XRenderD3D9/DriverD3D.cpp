@@ -6210,32 +6210,32 @@ void CD3D9Renderer::DrawFullScreenQuad(CShader* pSH, const CCryNameTSCRC& TechNa
 	float fHeight5 = (float)m_NewViewport.nHeight - 0.5f;
 
 	// NOTE: Get aligned stack-space (pointer and size aligned to manager's alignment requirement)
-	CryStackAllocWithSizeVector(SVF_TP3F_C4B_T2F, 4, Verts, CDeviceBufferManager::AlignBufferSizeForStreaming);
+	CryStackAllocWithSizeVector(SVF_P3F_C4B_T2F, 4, Verts, CDeviceBufferManager::AlignBufferSizeForStreaming);
 
 	std::swap(t0, t1);
-	Verts[0].pos = Vec4(-0.5f, -0.5f, 0.0f, 1.0f);
+	Verts[0].xyz = Vec4(-0.5f, -0.5f, 0.0f, 1.0f);
 	Verts[0].st = Vec2(s0, t0);
 	Verts[0].color.dcolor = (uint32) - 1;
 
-	Verts[1].pos = Vec4(fWidth5, -0.5f, 0.0f, 1.0f);
+	Verts[1].xyz = Vec4(fWidth5, -0.5f, 0.0f, 1.0f);
 	Verts[1].st = Vec2(s1, t0);
 	Verts[1].color.dcolor = (uint32) - 1;
 
-	Verts[2].pos = Vec4(-0.5f, fHeight5, 0.0f, 1.0f);
+	Verts[2].xyz = Vec4(-0.5f, fHeight5, 0.0f, 1.0f);
 	Verts[2].st = Vec2(s0, t1);
 	Verts[2].color.dcolor = (uint32) - 1;
 
-	Verts[3].pos = Vec4(fWidth5, fHeight5, 0.0f, 1.0f);
+	Verts[3].xyz = Vec4(fWidth5, fHeight5, 0.0f, 1.0f);
 	Verts[3].st = Vec2(s1, t1);
 	Verts[3].color.dcolor = (uint32) - 1;
 
-	TempDynVB<SVF_TP3F_C4B_T2F>::CreateFillAndBind(Verts, 4, 0);
+	TempDynVB<SVF_P3F_C4B_T2F>::CreateFillAndBind(Verts, 4, 0);
 
 	FX_Commit();
 
 	// Draw a fullscreen quad to sample the RT
 	FX_SetState(nState);
-	if (!FAILED(FX_SetVertexDeclaration(0, EDefaultInputLayouts::TP3F_C4B_T2F)))
+	if (!FAILED(FX_SetVertexDeclaration(0, EDefaultInputLayouts::P3F_C4B_T2F)))
 		FX_DrawPrimitive(eptTriangleStrip, 0, 4);
 
 	pSH->FXEndPass();

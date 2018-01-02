@@ -192,8 +192,8 @@ int Get_PerInstanceTessellationPatchId()
 // 8 weights skinning. this structure contains the extra 4 weights
 struct SSkinExtraBlendWeights
 {
-	uint  BlendWeights;  // ubyte[4] -> R8G8B8A8_UNORM
-	uint2 BlendIndices;  // short[4] -> R16G16B16A16_SINT
+	uint  BlendWeights;  // ubyte [4] -> R8G8B8A8_UNORM
+	uint2 BlendIndices;  // ushort[4] -> R16G16B16A16_UINT
 };
 
 StructuredBuffer<SSkinExtraBlendWeights> sb_SkinExtraBlendWeights[1] : register(t14); // t14 = 15 - size, size is 1, 15 is the tessellation buffer
@@ -203,7 +203,7 @@ StructuredBuffer<CSSkinVertexOut> SkinnedVertices : register(t16);
 struct SSkinBlendWeightsOut
 {
 	float4 BlendWeights;
-	int4 BlendIndices;
+	uint4 BlendIndices;
 };
 
 struct app2vertCommon
@@ -364,9 +364,9 @@ float4 D3DX_R8G8B8A8_UNORM_TO_FLOAT4(uint packedInput)
 	return unpackedOutput;
 }
 
-uint4 D3DX_R16G16B16A16_SINT_TO_UINT4(uint2 packedInput)
+uint4 D3DX_R16G16B16A16_UINT_TO_UINT4(uint2 packedInput)
 {
-	int4 unpackedOutput;
+	uint4 unpackedOutput;
 	unpackedOutput.x =  (packedInput[0]		& 0x0000ffff);
 	unpackedOutput.y =  (packedInput[0]>>16 & 0x0000ffff);
 	unpackedOutput.z =  (packedInput[1]		& 0x0000ffff);
@@ -384,7 +384,7 @@ void vtxStreamUnifySkinning( in app2vertCommon IN, inout streamPos OUT )
   {
     SSkinExtraBlendWeights ebw = sb_SkinExtraBlendWeights[0][IN.VertexID];
     OUT.skinBlends[1].BlendWeights = D3DX_R8G8B8A8_UNORM_TO_FLOAT4(ebw.BlendWeights);
-    OUT.skinBlends[1].BlendIndices = D3DX_R16G16B16A16_SINT_TO_UINT4(ebw.BlendIndices);
+    OUT.skinBlends[1].BlendIndices = D3DX_R16G16B16A16_UINT_TO_UINT4(ebw.BlendIndices);
   }
 #endif  
 
@@ -407,7 +407,6 @@ void vtxStreamUnifyTangents( in app2vertCommon IN, inout streamPos OUT )
 #if %TEMP_TERRAIN
 	// Output terrain normal
 	OUT.Normal = IN.Normal;
-	OUT.Normal.xyz = EXPAND(OUT.Normal.xyz);
 #else
 
 	#if %_RT_COMPUTE_SKINNING
@@ -1070,7 +1069,7 @@ void _VTModify(inout float4 inPos, float3 vNorm, float4x4 InstMatrix, streamPos 
 #endif  
 }
 
-float4 SkinPosition(int4 indices, float4 weights, int4 extraIndices, float4 extraWeights, inout float4 position, inout float3 normal, bool bPrevFrame = false)
+float4 SkinPosition(uint4 indices, float4 weights, uint4 extraIndices, float4 extraWeights, inout float4 position, inout float3 normal, bool bPrevFrame = false)
 {
 #if %_RT_SKELETON_SSD
 	ISOLATE	
@@ -1195,8 +1194,8 @@ float4 SkinPosition(int4 indices, float4 weights, int4 extraIndices, float4 extr
 }
 
 float4 SkinPositionTangent(
-	int4 indices, float4 weights,
-	int4 extraIndices, float4 extraWeights,
+	uint4 indices, float4 weights,
+	uint4 extraIndices, float4 extraWeights,
 	inout float4 position, inout float4 tangent,
 	inout float3x3 tangentFrame, inout float3 normal,
 	bool bPrevFrame = false)

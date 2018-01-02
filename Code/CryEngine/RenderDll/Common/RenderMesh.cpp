@@ -376,7 +376,7 @@ CRenderMesh::CRenderMesh()
 #ifdef MESH_TESSELLATION_RENDERER
 	m_adjBuffer.Create(0, sizeof(uint16), DXGI_FORMAT_R16_UNORM, CDeviceObjectFactory::BIND_SHADER_RESOURCE, nullptr);
 #endif
-	m_extraBonesBuffer.Create(0, sizeof(SVF_W4B_I4S), DXGI_FORMAT_UNKNOWN, CDeviceObjectFactory::BIND_SHADER_RESOURCE | CDeviceObjectFactory::USAGE_STRUCTURED, nullptr);
+	m_extraBonesBuffer.Create(0, sizeof(SVF_W4B_I4U), DXGI_FORMAT_UNKNOWN, CDeviceObjectFactory::BIND_SHADER_RESOURCE | CDeviceObjectFactory::USAGE_STRUCTURED, nullptr);
 }
 
 CRenderMesh::CRenderMesh (const char *szType, const char *szSourceName, bool bLock)
@@ -447,7 +447,7 @@ CRenderMesh::CRenderMesh (const char *szType, const char *szSourceName, bool bLo
 #ifdef MESH_TESSELLATION_RENDERER
 	m_adjBuffer.Create(0, sizeof(uint16), DXGI_FORMAT_R16_UNORM, CDeviceObjectFactory::BIND_SHADER_RESOURCE, nullptr);
 #endif
-	m_extraBonesBuffer.Create(0, sizeof(SVF_W4B_I4S), DXGI_FORMAT_UNKNOWN, CDeviceObjectFactory::BIND_SHADER_RESOURCE | CDeviceObjectFactory::USAGE_STRUCTURED, nullptr);
+	m_extraBonesBuffer.Create(0, sizeof(SVF_W4B_I4U), DXGI_FORMAT_UNKNOWN, CDeviceObjectFactory::BIND_SHADER_RESOURCE | CDeviceObjectFactory::USAGE_STRUCTURED, nullptr);
 }
 
 void CRenderMesh::Cleanup()
@@ -1043,37 +1043,36 @@ bool CRenderMesh::CopyStreamToSystemForUpdate(SMeshStream& MS, size_t nSize)
 
 size_t CRenderMesh::SetMesh_Int(CMesh &mesh, int nSecColorsSetOffset, uint32 flags, const Vec3 *pPosOffset)	
 {
-  LOADING_TIME_PROFILE_SECTION;
-  MEMORY_SCOPE_CHECK_HEAP();
+	LOADING_TIME_PROFILE_SECTION;
+	MEMORY_SCOPE_CHECK_HEAP();
 	MEMSTAT_CONTEXT(EMemStatContextTypes::MSC_RenderMeshType, 0, this->GetTypeName());
 	MEMSTAT_CONTEXT(EMemStatContextTypes::MSC_RenderMesh, 0, this->GetSourceName());
 
-  char *pVBuff = NULL;	
-  SPipTangents *pTBuff = NULL;
-  SPipQTangents *pQTBuff = NULL;
-  SVF_P3F *pVelocities = NULL;
-  SPipNormal *pNBuff = NULL;
-  uint32 nVerts = mesh.GetVertexCount();
-  uint32 nInds = mesh.GetIndexCount();
-  vtx_idx *pInds = NULL;
+	char *pVBuff = NULL;
+	SPipTangents *pTBuff = NULL;
+	SPipQTangents *pQTBuff = NULL;
+	SVF_P3F *pVelocities = NULL;
+	SPipNormal *pNBuff = NULL;
+	uint32 nVerts = mesh.GetVertexCount();
+	uint32 nInds = mesh.GetIndexCount();
+	vtx_idx *pInds = NULL;
 
 	//AUTO_LOCK(m_sResLock);//need a resource lock as mesh could be reseted due to allocation failure
 	LockForThreadAccess();
 
-  ReleaseRenderChunks(&m_ChunksSkinned);
+	ReleaseRenderChunks(&m_ChunksSkinned);
 
-  m_vBoxMin = mesh.m_bbox.min;
-  m_vBoxMax = mesh.m_bbox.max;
+	m_vBoxMin = mesh.m_bbox.min;
+	m_vBoxMax = mesh.m_bbox.max;
 
-  m_fGeometricMeanFaceArea = mesh.m_geometricMeanFaceArea;
+	m_fGeometricMeanFaceArea = mesh.m_geometricMeanFaceArea;
 
-  //////////////////////////////////////////////////////////////////////////
-  // Initialize Render Chunks.
-  //////////////////////////////////////////////////////////////////////////
-  uint32 numSubsets = mesh.GetSubSetCount();
-
+	//////////////////////////////////////////////////////////////////////////
+	// Initialize Render Chunks.
+	//////////////////////////////////////////////////////////////////////////
+	uint32 numSubsets = mesh.GetSubSetCount();
 	uint32 numChunks = 0;
-  for (uint32 i=0; i<numSubsets; i++)
+	for (uint32 i = 0; i < numSubsets; i++)
 	{
 		if (mesh.m_subsets[i].nNumIndices == 0)
 			continue;
@@ -1081,11 +1080,11 @@ size_t CRenderMesh::SetMesh_Int(CMesh &mesh, int nSecColorsSetOffset, uint32 fla
 		if(mesh.m_subsets[i].nMatFlags & MTL_FLAG_NODRAW)
 			continue;
 
-		++ numChunks;
+		++numChunks;
 	}
 	m_Chunks.reserve(numChunks);
 
-  for (uint32 i=0; i<numSubsets; i++)
+	for (uint32 i = 0; i < numSubsets; i++)
 	{
 		CRenderChunk ChunkInfo;
 
@@ -1141,50 +1140,52 @@ size_t CRenderMesh::SetMesh_Int(CMesh &mesh, int nSecColorsSetOffset, uint32 fla
 
 #define VALIDATE_CHUCKS
 #if defined(_DEBUG) && defined(VALIDATE_CHUCKS)
-		size_t indStart( pChunk->nFirstIndexId );
-		size_t indEnd( pChunk->nFirstIndexId + pChunk->nNumIndices );
-		for( size_t j( indStart ); j < indEnd; ++j )
+		size_t indStart(pChunk->nFirstIndexId);
+		size_t indEnd(pChunk->nFirstIndexId + pChunk->nNumIndices);
+		for (size_t j(indStart); j < indEnd; ++j)
 		{
-			size_t vtxStart( pChunk->nFirstVertId );
-			size_t vtxEnd( pChunk->nFirstVertId + pChunk->nNumVerts );
-			size_t curIndex0( mesh.m_pIndices[ j ] ); // absolute indexing
-			size_t curIndex1( mesh.m_pIndices[ j ] + vtxStart ); // relative indexing using base vertex index
-			assert( ( curIndex0 >= vtxStart && curIndex0 < vtxEnd ) || ( curIndex1 >= vtxStart && curIndex1 < vtxEnd ) ) ;
+			size_t vtxStart(pChunk->nFirstVertId);
+			size_t vtxEnd(pChunk->nFirstVertId + pChunk->nNumVerts);
+			size_t curIndex0(mesh.m_pIndices[j]); // absolute indexing
+			size_t curIndex1(mesh.m_pIndices[j] + vtxStart); // relative indexing using base vertex index
+
+			assert((curIndex0 >= vtxStart && curIndex0 < vtxEnd) || (curIndex1 >= vtxStart && curIndex1 < vtxEnd));
 		}
 #endif
 	}
 
-  //////////////////////////////////////////////////////////////////////////
-  // Create RenderElements.
-  //////////////////////////////////////////////////////////////////////////
-  int nCurChunk = 0;
-  for (int i=0; i<mesh.GetSubSetCount(); i++)
-  {
-    SMeshSubset &subset = mesh.m_subsets[i];
-    if (subset.nNumIndices == 0)
-      continue;
+	//////////////////////////////////////////////////////////////////////////
+	// Create RenderElements.
+	//////////////////////////////////////////////////////////////////////////
+	int nCurChunk = 0;
+	for (int i = 0; i < mesh.GetSubSetCount(); i++)
+	{
+		SMeshSubset &subset = mesh.m_subsets[i];
+		if (subset.nNumIndices == 0)
+			continue;
 
-    if(subset.nMatFlags & MTL_FLAG_NODRAW)
-      continue;
+		if (subset.nMatFlags & MTL_FLAG_NODRAW)
+			continue;
 
-    CRenderChunk *pRenderChunk = &m_Chunks[nCurChunk++];
-    CREMeshImpl *pRenderElement = (CREMeshImpl*) gRenDev->EF_CreateRE(eDATA_Mesh);
+		CRenderChunk *pRenderChunk = &m_Chunks[nCurChunk++];
+		CREMeshImpl *pRenderElement = (CREMeshImpl*)gRenDev->EF_CreateRE(eDATA_Mesh);
 
-    // Cross link render chunk with render element.
-    pRenderChunk->pRE = pRenderElement;
-    AssignChunk(pRenderChunk, pRenderElement);
+		// Cross link render chunk with render element.
+		pRenderChunk->pRE = pRenderElement;
+		AssignChunk(pRenderChunk, pRenderElement);
 
 		if (mesh.m_pBoneMapping)
 			pRenderElement->mfUpdateFlags(FCEF_SKINNED);
-  }
-  if (mesh.m_pBoneMapping)
-    m_nFlags |= FRM_SKINNED;
+	}
 
-  //////////////////////////////////////////////////////////////////////////
-  // Create system vertex buffer in system memory.
-  //////////////////////////////////////////////////////////////////////////
+	if (mesh.m_pBoneMapping)
+		m_nFlags |= FRM_SKINNED;
+
+	//////////////////////////////////////////////////////////////////////////
+	// Create system vertex buffer in system memory.
+	//////////////////////////////////////////////////////////////////////////
 #if ENABLE_NORMALSTREAM_SUPPORT
-  if (flags & FSM_ENABLE_NORMALSTREAM)
+	if (flags & FSM_ENABLE_NORMALSTREAM)
 		m_nFlags |= FRM_ENABLE_NORMALSTREAM;
 #endif
 
@@ -1196,8 +1197,9 @@ size_t CRenderMesh::SetMesh_Int(CMesh &mesh, int nSecColorsSetOffset, uint32 fla
 	}
 	else
 	{
-		m_eVF = EDefaultInputLayouts::P3S_C4B_T2S;
+		m_eVF = EDefaultInputLayouts::P3H_C4B_T2H;
 	}
+
 	pVBuff = (char *)LockVB(VSF_GENERAL, FSL_VIDEO_CREATE);
 	// stop initializing if allocation failed
 	if (pVBuff == NULL) 
@@ -1208,19 +1210,19 @@ size_t CRenderMesh::SetMesh_Int(CMesh &mesh, int nSecColorsSetOffset, uint32 fla
 
 # if ENABLE_NORMALSTREAM_SUPPORT
 	if (m_nFlags & FRM_ENABLE_NORMALSTREAM)
-		pNBuff = (SPipNormal *)LockVB(VSF_NORMALS, FSL_VIDEO_CREATE);
+		pNBuff = (SPipNormal*)LockVB(VSF_NORMALS, FSL_VIDEO_CREATE);
 # endif
 
-  if (!(flags & FSM_NO_TANGENTS))
+	if (!(flags & FSM_NO_TANGENTS))
 	{
 		if (mesh.m_pQTangents)
-			pQTBuff = (SPipQTangents *)LockVB(VSF_QTANGENTS, FSL_VIDEO_CREATE);
+			pQTBuff = (SPipQTangents*)LockVB(VSF_QTANGENTS, FSL_VIDEO_CREATE);
 		else
-      pTBuff = (SPipTangents *)LockVB(VSF_TANGENTS, FSL_VIDEO_CREATE);
+			pTBuff = (SPipTangents*)LockVB(VSF_TANGENTS, FSL_VIDEO_CREATE);
 
 		// stop initializing if allocation failed
 		if (pTBuff == NULL && pQTBuff == NULL)
-      goto error;
+			goto error;
 	}
 
 	//////////////////////////////////////////////////////////////////////////
@@ -1238,7 +1240,7 @@ size_t CRenderMesh::SetMesh_Int(CMesh &mesh, int nSecColorsSetOffset, uint32 fla
 
 	if (flags & FSM_VERTEX_VELOCITY)
 	{
-		pVelocities = (SVF_P3F *)LockVB(VSF_VERTEX_VELOCITY, FSL_VIDEO_CREATE);
+		pVelocities = (SVF_P3F*)LockVB(VSF_VERTEX_VELOCITY, FSL_VIDEO_CREATE);
 
 		// stop initializing if allocation failed
 		if (pVelocities == NULL)
@@ -1261,7 +1263,8 @@ size_t CRenderMesh::SetMesh_Int(CMesh &mesh, int nSecColorsSetOffset, uint32 fla
 			flags,
 			pNBuff
 		};
-		SetMesh_IntImpl( setMeshIntData );
+
+		SetMesh_IntImpl(setMeshIntData);
 	}
 
 	// unlock all streams
@@ -1285,43 +1288,45 @@ size_t CRenderMesh::SetMesh_Int(CMesh &mesh, int nSecColorsSetOffset, uint32 fla
 		UnlockVB(VSF_VERTEX_VELOCITY);
 	}
 
-  //////////////////////////////////////////////////////////////////////////
-  // Copy skin-streams.
-  //////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////
+	// Copy skin-streams.
+	//////////////////////////////////////////////////////////////////////////
 
 	m_nFlags &= ~FSM_USE_COMPUTE_SKINNING;
 
-  if (mesh.m_pBoneMapping) 
+	if (mesh.m_pBoneMapping)
 	{
 		if (flags & FSM_USE_COMPUTE_SKINNING)
 			m_nFlags |= FSM_USE_COMPUTE_SKINNING;
-    SetSkinningDataCharacter(mesh, flags, mesh.m_pBoneMapping, mesh.m_pExtraBoneMapping);
+
+		SetSkinningDataCharacter(mesh, flags, mesh.m_pBoneMapping, mesh.m_pExtraBoneMapping);
 	}
 
-  // Create device buffers immediately in non-multithreaded mode
-  if (!gRenDev->m_pRT->IsMultithreaded() && (flags & FSM_CREATE_DEVICE_MESH))
-  {
+	// Create device buffers immediately in non-multithreaded mode
+	if (!gRenDev->m_pRT->IsMultithreaded() && (flags & FSM_CREATE_DEVICE_MESH))
+	{
 		CheckUpdate(m_eVF, VSM_MASK);
-  }
+	}
 
 	UnLockForThreadAccess();
 	return Size(SIZE_ONLY_SYSTEM);
 
 error:
 	UnLockForThreadAccess();
-  RT_AllocationFailure("Generic Streaming Error", 0 );
-  return ~0U;
+	RT_AllocationFailure("Generic Streaming Error", 0);
+	return ~0U;
 }
 
 size_t CRenderMesh::SetMesh(CMesh &mesh, int nSecColorsSetOffset, uint32 flags, const Vec3 *pPosOffset, bool requiresLock)
 {
-  LOADING_TIME_PROFILE_SECTION;
-  MEMORY_SCOPE_CHECK_HEAP();
-  size_t resultingSize = ~0U;
+	LOADING_TIME_PROFILE_SECTION;
+	MEMORY_SCOPE_CHECK_HEAP();
+	size_t resultingSize = ~0U;
 # ifdef USE_VBIB_PUSH_DOWN
-  requiresLock = true;
+	requiresLock = true;
 # endif
-  if(requiresLock)
+
+	if (requiresLock)
 	{
 		SREC_AUTO_LOCK(m_sResLock);
 		resultingSize = SetMesh_Int(mesh, nSecColorsSetOffset, flags, pPosOffset);
@@ -1331,7 +1336,7 @@ size_t CRenderMesh::SetMesh(CMesh &mesh, int nSecColorsSetOffset, uint32 flags, 
 		resultingSize = SetMesh_Int(mesh, nSecColorsSetOffset, flags, pPosOffset);
 	}
 
-  return resultingSize;
+	return resultingSize;
 }
 
 void CRenderMesh::SetSkinningDataVegetation(struct SMeshBoneMapping_uint8 *pBoneMapping)
@@ -1340,7 +1345,7 @@ void CRenderMesh::SetSkinningDataVegetation(struct SMeshBoneMapping_uint8 *pBone
 	MEMSTAT_CONTEXT(EMemStatContextTypes::MSC_RenderMesh, 0, this->GetSourceName());
   MEMORY_SCOPE_CHECK_HEAP();
 	LockForThreadAccess();
-  SVF_W4B_I4S *pSkinBuff = (SVF_W4B_I4S *)LockVB(VSF_HWSKIN_INFO, FSL_VIDEO_CREATE);
+  SVF_W4B_I4U *pSkinBuff = (SVF_W4B_I4U *)LockVB(VSF_HWSKIN_INFO, FSL_VIDEO_CREATE);
 
 	// stop initializing if allocation failed
 	if( pSkinBuff == NULL ) return;
@@ -1390,7 +1395,7 @@ void CRenderMesh::SetSkinningDataCharacter(CMesh& mesh, uint32 flags, struct SMe
   MEMORY_SCOPE_CHECK_HEAP();
 	MEMSTAT_CONTEXT(EMemStatContextTypes::MSC_RenderMeshType, 0, this->GetTypeName());
 	MEMSTAT_CONTEXT(EMemStatContextTypes::MSC_RenderMesh, 0, this->GetSourceName());
-  SVF_W4B_I4S *pSkinBuff = (SVF_W4B_I4S *)LockVB(VSF_HWSKIN_INFO, FSL_VIDEO_CREATE);
+  SVF_W4B_I4U *pSkinBuff = (SVF_W4B_I4U *)LockVB(VSF_HWSKIN_INFO, FSL_VIDEO_CREATE);
 
 	// stop initializing if allocation failed
 	if( pSkinBuff == NULL ) {return; }
@@ -1429,7 +1434,7 @@ void CRenderMesh::SetSkinningDataCharacter(CMesh& mesh, uint32 flags, struct SMe
 
 	UnlockVB(VSF_HWSKIN_INFO);
 
-	std::vector<SVF_W4B_I4S> pExtraBones;
+	std::vector<SVF_W4B_I4U> pExtraBones;
 
 	if (pExtraBoneMapping && m_extraBonesBuffer.IsNullBuffer() && m_nVerts)
 	{
@@ -1466,7 +1471,7 @@ void CRenderMesh::SetSkinningDataCharacter(CMesh& mesh, uint32 flags, struct SMe
 
 		m_nFlags |= FRM_SKINNED_EIGHT_WEIGHTS;
 
-		m_extraBonesBuffer.Create(pExtraBones.size(), sizeof(SVF_W4B_I4S), DXGI_FORMAT_UNKNOWN, CDeviceObjectFactory::USAGE_STRUCTURED | CDeviceObjectFactory::BIND_SHADER_RESOURCE, &pExtraBones[0]);
+		m_extraBonesBuffer.Create(pExtraBones.size(), sizeof(SVF_W4B_I4U), DXGI_FORMAT_UNKNOWN, CDeviceObjectFactory::USAGE_STRUCTURED | CDeviceObjectFactory::BIND_SHADER_RESOURCE, &pExtraBones[0]);
 	}
 	else
 	{
@@ -1475,7 +1480,7 @@ void CRenderMesh::SetSkinningDataCharacter(CMesh& mesh, uint32 flags, struct SMe
 		// happen anyway)
 		m_nFlags &= ~FRM_SKINNED_EIGHT_WEIGHTS;
 
-		m_extraBonesBuffer.Create(0, sizeof(SVF_W4B_I4S), DXGI_FORMAT_UNKNOWN, CDeviceObjectFactory::USAGE_STRUCTURED | CDeviceObjectFactory::BIND_SHADER_RESOURCE, nullptr);
+		m_extraBonesBuffer.Create(0, sizeof(SVF_W4B_I4U), DXGI_FORMAT_UNKNOWN, CDeviceObjectFactory::USAGE_STRUCTURED | CDeviceObjectFactory::BIND_SHADER_RESOURCE, nullptr);
 	}
 
 	static ICVar* cvar_gd = gEnv->pConsole->GetCVar("r_ComputeSkinning");
@@ -1558,7 +1563,7 @@ void CRenderMesh::ComputeSkinningCreateBindPoseAndMorphBuffers(CMesh& mesh)
 	m_computeSkinningDataSupply->PushBindPoseBuffers(m_nVerts, m_nInds, adjTriangles.size(), &vertices[0], mesh.m_pIndices, &adjTriangles[0]);
 }
 
-void CRenderMesh::ComputeSkinningCreateSkinningBuffers(const SVF_W4B_I4S* pBoneMapping, const SMeshBoneMapping_uint16* pExtraBoneMapping)
+void CRenderMesh::ComputeSkinningCreateSkinningBuffers(const SVF_W4B_I4U* pBoneMapping, const SMeshBoneMapping_uint16* pExtraBoneMapping)
 {
 	MEMORY_SCOPE_CHECK_HEAP();
 
@@ -1623,91 +1628,128 @@ uint CRenderMesh::GetSkinningWeightCount() const
 
 IIndexedMesh *CRenderMesh::GetIndexedMesh(IIndexedMesh *pIdxMesh)
 {
-  MEMORY_SCOPE_CHECK_HEAP();
+	MEMORY_SCOPE_CHECK_HEAP();
 	struct MeshDataLock
 	{
-    MeshDataLock(CRenderMesh *pMesh) : _Mesh(pMesh) { _Mesh->LockForThreadAccess(); }
-    ~MeshDataLock() { _Mesh->UnLockForThreadAccess(); }
-    CRenderMesh *_Mesh;
-  };
-  MeshDataLock _lock(this);
+		MeshDataLock(CRenderMesh *pMesh) : _Mesh(pMesh) { _Mesh->LockForThreadAccess(); }
+		~MeshDataLock() { _Mesh->UnLockForThreadAccess(); }
+		CRenderMesh *_Mesh;
+	};
+	MeshDataLock _lock(this);
 
-  if (!pIdxMesh)
-    pIdxMesh = gEnv->p3DEngine->CreateIndexedMesh();
+	if (!pIdxMesh)
+		pIdxMesh = gEnv->p3DEngine->CreateIndexedMesh();
 
 	// catch failed allocation of IndexedMesh
 	if( pIdxMesh == NULL )
 		return NULL;
 
-  CMesh* const pMesh = pIdxMesh->GetMesh();
-  int i,j;
+	CMesh* const pMesh = pIdxMesh->GetMesh();
+	int i, j;
 
-  pIdxMesh->SetVertexCount(m_nVerts);
-  pIdxMesh->SetTexCoordCount(m_nVerts);
-  pIdxMesh->SetTangentCount(m_nVerts);
-  pIdxMesh->SetIndexCount(m_nInds);
-  pIdxMesh->SetSubSetCount(m_Chunks.size());
+	pIdxMesh->SetVertexCount(m_nVerts);
+	pIdxMesh->SetTexCoordCount(m_nVerts);
+	pIdxMesh->SetTangentCount(m_nVerts);
+	pIdxMesh->SetNormalCount(m_nVerts);
+	pIdxMesh->SetIndexCount(m_nInds);
+	pIdxMesh->SetSubSetCount(m_Chunks.size());
 
-  strided_pointer<Vec3> pVtx;
-  strided_pointer<SPipTangents> pTangs;
-  strided_pointer<Vec2> pTex;
-  pVtx.data = (Vec3*)GetPosPtr(pVtx.iStride, FSL_READ);
-  //pNorm.data = (Vec3*)GetNormalPtr(pNorm.iStride);
-  pTex.data = (Vec2*)GetUVPtr(pTex.iStride, FSL_READ);
-  pTangs.data = (SPipTangents*)GetTangentPtr(pTangs.iStride, FSL_READ);
+	strided_pointer<Vec3> pVtx;
+	strided_pointer<SPipNormal> pNorm;
+	strided_pointer<SPipTangents> pTangs;
+	strided_pointer<Vec2> pTex;
+
+	pVtx.data   = (Vec3*)GetPosPtr(pVtx.iStride, FSL_READ);
+	pNorm.data  = (SPipNormal*)GetNormPtr(pNorm.iStride, FSL_READ);
+	pTex.data   = (Vec2*)GetUVPtr(pTex.iStride, FSL_READ);
+	pTangs.data = (SPipTangents*)GetTangentPtr(pTangs.iStride, FSL_READ);
 
 	// don't copy if some src, or dest buffer is NULL (can happen because of failed allocations)
-	if(		pVtx.data == NULL			|| (pMesh->m_pPositions == NULL && pMesh->m_pPositionsF16 == NULL) ||
-				pTex.data == NULL			|| pMesh->m_pTexCoord == NULL ||
-				pTangs.data == NULL		|| pMesh->m_pTangents  == NULL )
+	if (pVtx.data   == NULL || (pMesh->m_pPositions == NULL && pMesh->m_pPositionsF16 == NULL) ||
+	    pTex.data   == NULL || (pMesh->m_pTexCoord  == NULL) ||
+	    pTangs.data == NULL || (pMesh->m_pTangents  == NULL))
 	{
 		UnlockStream(VSF_GENERAL);
+		UnlockStream(VSF_TANGENTS);
+		UnlockStream(VSF_QTANGENTS);
+		UnlockStream(VSF_NORMALS);
+
 		delete pIdxMesh;
 		return NULL;
 	}
 
-  for(i=0;i<(int)m_nVerts;i++)
-  {
-    pMesh->m_pPositions[i] = pVtx[i];
-    pMesh->m_pTexCoord [i] = SMeshTexCoord(pTex[i]);
-    pMesh->m_pTangents [i] = SMeshTangents(pTangs[i]);
-		Vec3 n;
-		pMesh->m_pTangents[i].GetN(n);
-    pMesh->m_pNorms    [i] = SMeshNormal(n);
-  }
+	for (i = 0; i < (int)m_nVerts; i++)
+	{
+		pMesh->m_pPositions[i] = pVtx[i];
+		pMesh->m_pTexCoord[i] = SMeshTexCoord(pTex[i]);
+		pMesh->m_pTangents[i] = SMeshTangents(pTangs[i]);
+	}
 
-  if (m_eVF==EDefaultInputLayouts::P3S_C4B_T2S || m_eVF==EDefaultInputLayouts::P3F_C4B_T2F || m_eVF==EDefaultInputLayouts::P3S_N4B_C4B_T2S)
-  {
-    strided_pointer<UCol> pColors;
-    pColors.data = (UCol*)GetColorPtr(pColors.iStride, FSL_READ);
-    pIdxMesh->SetColorCount(m_nVerts);
+	if (m_eVF == EDefaultInputLayouts::P3F_C4B_T2F ||
+	    m_eVF == EDefaultInputLayouts::P3F_C4B_T2H ||
+	    m_eVF == EDefaultInputLayouts::P3H_C4B_T2H ||
+	    m_eVF == EDefaultInputLayouts::P3H_C4B_T2H_N4C)
+	{
+		pIdxMesh->SetColorCount(m_nVerts);
+
+		strided_pointer<UCol> pColors;
+
+		pColors.data = (UCol*)GetColorPtr(pColors.iStride, FSL_READ);
+
+		for (i = 0; i < (int)m_nVerts; i++)
+			pMesh->m_pColors[i] = SMeshColor(pColors[i].r, pColors[i].g, pColors[i].b, pColors[i].a);
+	}
+
+	if (pNorm.data && (m_eVF == EDefaultInputLayouts::P3H_C4B_T2H_N4C))
+	{
+		strided_pointer<SCol> pNorms;
+
+		pNorms.data = (SCol*)GetNormPtr(pNorms.iStride, FSL_READ);
+
+		for (i = 0; i < (int)m_nVerts; i++)
+			pMesh->m_pNormals[i] = SMeshNormal(pNorms[i].GetN());
+
+	}
+	else if (pNorm.data)
+	{
+		for (i = 0; i < (int)m_nVerts; i++)
+			pMesh->m_pNormals[i] = SMeshNormal(pNorm[i].GetN());
+	}
+	else
+	{
+		for (i = 0; i < (int)m_nVerts; i++)
+			pMesh->m_pNormals[i] = SMeshNormal(pTangs[i].GetN());
+	}
+
+	UnlockStream(VSF_GENERAL);
+	UnlockStream(VSF_TANGENTS);
+	UnlockStream(VSF_QTANGENTS);
+	UnlockStream(VSF_NORMALS);
+
+	vtx_idx *pInds = GetIndexPtr(FSL_READ);
+	for (i = 0; i < (int)m_nInds; i++)
+		pMesh->m_pIndices[i] = pInds[i];
+
+	UnlockIndexStream();
+
+	SVF_W4B_I4U *pSkinBuff = (SVF_W4B_I4U*)LockVB(VSF_HWSKIN_INFO, FSL_READ);
+	if (pSkinBuff)
+	{
+		pIdxMesh->AllocateBoneMapping();
 		for (i = 0; i < (int)m_nVerts; i++)
 		{
-      pMesh->m_pColor0[i] = SMeshColor(pColors[i].r, pColors[i].g, pColors[i].b, pColors[i].a);
-    }
-  }
-  UnlockStream(VSF_GENERAL);
+			for (j = 0; j < 4; j++)
+			{
+				pMesh->m_pBoneMapping[i].boneIds[j] = pSkinBuff[i].indices[j];
+				pMesh->m_pBoneMapping[i].weights[j] = pSkinBuff[i].weights.bcolor[j];
+			}
+		}
 
-  vtx_idx *pInds = GetIndexPtr(FSL_READ);
-  for(i=0;i<(int)m_nInds;i++)
-    pMesh->m_pIndices[i] = pInds[i];
-  UnlockIndexStream();
+		UnlockVB(VSF_HWSKIN_INFO);
+	}
 
-  SVF_W4B_I4S *pSkinBuff = (SVF_W4B_I4S*)LockVB(VSF_HWSKIN_INFO, FSL_READ);
-  if (pSkinBuff)
-  {
-    pIdxMesh->AllocateBoneMapping();
-    for(i=0;i<(int)m_nVerts;i++) 
-      for(j=0;j<4;j++)
-    {
-      pMesh->m_pBoneMapping[i].boneIds[j] = pSkinBuff[i].indices[j];
-      pMesh->m_pBoneMapping[i].weights[j] = pSkinBuff[i].weights.bcolor[j];
-    }
-    UnlockVB(VSF_HWSKIN_INFO);
-  }
-
-  for(i=0;i<(int)m_Chunks.size();i++)
-  {
+	for (i = 0; i < (int)m_Chunks.size(); i++)
+	{
 		pIdxMesh->SetSubsetIndexVertexRanges(i, m_Chunks[i].nFirstIndexId, m_Chunks[i].nNumIndices, m_Chunks[i].nFirstVertId, m_Chunks[i].nNumVerts);
 		pIdxMesh->SetSubsetMaterialId(i, m_Chunks[i].m_nMatID);
 		const int nMatFlags = m_Chunks[i].m_nMatFlags;
@@ -1719,24 +1761,24 @@ IIndexedMesh *CRenderMesh::GetIndexedMesh(IIndexedMesh *pIdxMesh)
 		const SMeshSubset &mss = pIdxMesh->GetSubSet(i);
 		Vec3 vCenter;
 		vCenter.zero();
-    for(j=mss.nFirstIndexId; j<mss.nFirstIndexId+mss.nNumIndices; j++)
+		for (j = mss.nFirstIndexId; j < mss.nFirstIndexId + mss.nNumIndices; j++)
 		{
-      vCenter += pMesh->m_pPositions[pMesh->m_pIndices[j]];
+			vCenter += pMesh->m_pPositions[pMesh->m_pIndices[j]];
 		}
-    if (mss.nNumIndices)
+		if (mss.nNumIndices)
 		{
-      vCenter /= (float)mss.nNumIndices;
+			vCenter /= (float)mss.nNumIndices;
 		}
 		float fRadius = 0;
-    for(j=mss.nFirstIndexId; j<mss.nFirstIndexId+mss.nNumIndices; j++)
+		for (j = mss.nFirstIndexId; j < mss.nFirstIndexId + mss.nNumIndices; j++)
 		{
-      fRadius = max(fRadius, (pMesh->m_pPositions[pMesh->m_pIndices[j]]-vCenter).len2());
+			fRadius = max(fRadius, (pMesh->m_pPositions[pMesh->m_pIndices[j]] - vCenter).len2());
 		}
 		fRadius = sqrt_tpl(fRadius);
 		pIdxMesh->SetSubsetBounds(i, vCenter, fRadius);
-  }
+	}
 
-  return pIdxMesh;
+	return pIdxMesh;
 }
 
 void CRenderMesh::GenerateQTangents()
@@ -1997,7 +2039,7 @@ void CRenderMesh::SetChunk(IMaterial *pNewMat, int nFirstVertId, int nVertCount,
 
 bool CRenderMesh::PrepareCachePos()
 {
-	if (!m_pCachePos && (m_eVF == EDefaultInputLayouts::P3S_C4B_T2S || m_eVF == EDefaultInputLayouts::P3S_N4B_C4B_T2S))
+	if (!m_pCachePos && (m_eVF == EDefaultInputLayouts::P3H_C4B_T2H || m_eVF == EDefaultInputLayouts::P3H_C4B_T2H_N4C))
 	{
 		m_pCachePos = AllocateMeshData<Vec3>(m_nVerts);
 		if (m_pCachePos)
@@ -2012,7 +2054,7 @@ bool CRenderMesh::PrepareCachePos()
 bool CRenderMesh::CreateCachePos(byte *pSrc, uint32 nStrideSrc, uint nFlags)
 {
   PROFILE_FRAME(Mesh_CreateCachePos);
-  if (m_eVF == EDefaultInputLayouts::P3S_C4B_T2S || m_eVF == EDefaultInputLayouts::P3S_N4B_C4B_T2S)
+  if (m_eVF == EDefaultInputLayouts::P3H_C4B_T2H || m_eVF == EDefaultInputLayouts::P3H_C4B_T2H_N4C)
 	{
 	#ifdef USE_VBIB_PUSH_DOWN
 		SREC_AUTO_LOCK(m_sResLock);//on USE_VBIB_PUSH_DOWN tick is executed in renderthread
@@ -2049,7 +2091,7 @@ bool CRenderMesh::CreateCachePos(byte *pSrc, uint32 nStrideSrc, uint nFlags)
 bool CRenderMesh::CreateCacheUVs(byte *pSrc, uint32 nStrideSrc, uint nFlags)
 {
 	PROFILE_FRAME(Mesh_CreateCacheUVs);
-	if (m_eVF == EDefaultInputLayouts::P3S_C4B_T2S || m_eVF == EDefaultInputLayouts::P3S_N4B_C4B_T2S)
+	if (m_eVF == EDefaultInputLayouts::P3H_C4B_T2H || m_eVF == EDefaultInputLayouts::P3H_C4B_T2H_N4C)
 	{
 		m_nFlagsCacheUVs = (nFlags & FSL_WRITE) != 0;
 		m_nFrameRequestCacheUVs = gRenDev->m_RP.m_TI[gRenDev->m_RP.m_nFillThreadID].m_nFrameUpdateID;
@@ -2148,13 +2190,11 @@ byte *CRenderMesh::GetNormPtr(int32& nStride, uint32 nFlags, int32 nOffset)
   byte *pData = 0;
 # if ENABLE_NORMALSTREAM_SUPPORT
   pData = (byte *)LockVB(VSF_NORMALS, nFlags, nOffset, 0, &nStr);
+  //ASSERT_LOCK;
   if (pData)
   {
-    nStride = sizeof(SPipNormal);
-    int8 offs = CDeviceObjectFactory::LookupInputLayout(EDefaultInputLayouts::N3F).first.m_Offsets[SInputLayout::eOffset_Normal];
-    if (offs >= 0)
-      return &pData[offs];
-    return NULL;
+    nStride = nStr;
+    return pData;
   }
 # endif
   pData = (byte *)LockVB(VSF_GENERAL, nFlags, nOffset, 0, &nStr);
@@ -2584,9 +2624,9 @@ bool CRenderMesh::RT_CheckUpdate(CRenderMesh *pVContainer, InputLayoutHandle eVF
 		if (!(pVContainer->m_IBStream.m_nLockFlags & FSL_WRITE)
 			&& (pVContainer->_HasVBStream(VSF_NORMALS)))
 		{
-			if (m_eVF == EDefaultInputLayouts::P3S_C4B_T2S)
+			if (m_eVF == EDefaultInputLayouts::P3H_C4B_T2H)
 			{
-				UpdateUVCoordsAdjacency<SVF_P3S_C4B_T2S, Vec3f16, Vec2f16>(m_IBStream);
+				UpdateUVCoordsAdjacency<SVF_P3H_C4B_T2H, Vec3f16, Vec2f16>(m_IBStream);
 			}
 			else if (m_eVF == EDefaultInputLayouts::P3F_C4B_T2F)
 			{
@@ -2969,7 +3009,7 @@ template<class VertexFormat, class VecPos, class VecUV> bool CRenderMesh::Update
 
 			// create triangles with adjacency
 			VertexFormat *pVertexStream = (VertexFormat *)pMS->m_pUpdateData;
-			if ((m_eVF == EDefaultInputLayouts::P3S_C4B_T2S || m_eVF == EDefaultInputLayouts::P3F_C4B_T2F) && pVertexStream)
+			if ((m_eVF == EDefaultInputLayouts::P3H_C4B_T2H || m_eVF == EDefaultInputLayouts::P3F_C4B_T2F) && pVertexStream)
 			{
 				int nTrgs = m_nInds / 3;
 				pTxtAdjBuffer.resize(nTrgs * 12);
@@ -3525,9 +3565,9 @@ static void BlendWeights(DualQuat& dq, Array<const DualQuat> aBoneLocs, const Jo
 struct PosNormData
 {
 	strided_pointer<Vec3> aPos;
-	strided_pointer<SVF_P3S_N4B_C4B_T2S> aVert;
 	strided_pointer<SPipQTangents> aQTan;
 	strided_pointer<SPipTangents> aTan2;
+	strided_pointer<SVF_P3H_C4B_T2H_N4C> aVert;
 
 	void GetPosNorm(PosNorm& ran, int nV)
 	{
@@ -3555,7 +3595,7 @@ struct SkinnedPosNormData: PosNormData
 	strided_pointer<SVF_P3F_P3F_I4B> aMorphing;
 #endif
 
-	strided_pointer<SVF_W4B_I4S> aSkinning;
+	strided_pointer<SVF_W4B_I4U> aSkinning;
 
 	SkinnedPosNormData() : pSkinningData(nullptr) {}
 
@@ -3652,7 +3692,7 @@ void CRenderMesh::GetRandomPos(PosNorm& ran, CRndGen& seed, EGeomForm eForm, SSk
 	if (vdata.aPos.data = (Vec3*)GetPosPtr(vdata.aPos.iStride, FSL_READ))
 	{
 		// Check possible sources for normals.
-		if (_GetVertexFormat() != EDefaultInputLayouts::P3S_N4B_C4B_T2S || !GetStridedArray(vdata.aVert, VSF_GENERAL))
+		if (_GetVertexFormat() != EDefaultInputLayouts::P3H_C4B_T2H_N4C || !GetStridedArray(vdata.aVert, VSF_GENERAL))
 			if (!GetStridedArray(vdata.aQTan, VSF_QTANGENTS))
 				GetStridedArray(vdata.aTan2, VSF_TANGENTS);
 
@@ -4376,8 +4416,8 @@ void CRenderMesh::CreateRemappedBoneIndicesPair(const uint pairGuid, const TRend
 	vtx_idx *indices = GetIndexPtr(FSL_READ);
 	uint32 vtxCount = GetVerticesCount();
 	std::vector<bool> touched(vtxCount, false); 
-	const SVF_W4B_I4S* pIndicesWeights = reinterpret_cast<SVF_W4B_I4S*>(GetHWSkinPtr(stride, FSL_READ)); 
-	SVF_W4B_I4S* remappedIndices = reinterpret_cast<SVF_W4B_I4S*>(AllocateMeshDataUnpooled(sizeof(SVF_W4B_I4S) * vtxCount));
+	const SVF_W4B_I4U* pIndicesWeights = reinterpret_cast<SVF_W4B_I4U*>(GetHWSkinPtr(stride, FSL_READ)); 
+	SVF_W4B_I4U* remappedIndices = reinterpret_cast<SVF_W4B_I4U*>(AllocateMeshDataUnpooled(sizeof(SVF_W4B_I4U) * vtxCount));
 
 	for (size_t j=0; j<Chunks.size(); ++j)
 	{
@@ -4458,8 +4498,8 @@ void CRenderMesh::CreateRemappedBoneIndicesPair(const DynArray<JointIdType> &arr
 	vtx_idx* const indices = GetIndexPtr(FSL_READ);
 	uint32 vtxCount = GetVerticesCount();
 	std::vector<bool> touched(vtxCount, false);
-	const SVF_W4B_I4S* pIndicesWeights = reinterpret_cast<SVF_W4B_I4S*>(GetHWSkinPtr(stride, FSL_READ));
-	SVF_W4B_I4S* remappedIndices = reinterpret_cast<SVF_W4B_I4S*>(AllocateMeshDataUnpooled(sizeof(SVF_W4B_I4S) * vtxCount));
+	const SVF_W4B_I4U* pIndicesWeights = reinterpret_cast<SVF_W4B_I4U*>(GetHWSkinPtr(stride, FSL_READ));
+	SVF_W4B_I4U* remappedIndices = reinterpret_cast<SVF_W4B_I4U*>(AllocateMeshDataUnpooled(sizeof(SVF_W4B_I4U) * vtxCount));
 
 	for (size_t j=0; j<m_Chunks.size(); ++j)
 	{
@@ -5136,10 +5176,10 @@ void SMeshSubSetIndicesJobEntry::CreateSubSetRenderMesh()
 		pSrcMesh->UnLockForThreadAccess();
 
 		IRenderMesh::SInitParamerers params;
-		SVF_P3S_C4B_T2S tempVertex;
+		SVF_P3H_C4B_T2H tempVertex;
 		params.pVertBuffer       = &tempVertex;
 		params.nVertexCount      = 1;
-		params.eVertexFormat     = EDefaultInputLayouts::P3S_C4B_T2S;
+		params.eVertexFormat     = EDefaultInputLayouts::P3H_C4B_T2H;
 		params.pIndices          = lstIndices.GetElements();
 		params.nIndexCount       = lstIndices.Count();
 		params.nPrimetiveType    = prtTriangleList;

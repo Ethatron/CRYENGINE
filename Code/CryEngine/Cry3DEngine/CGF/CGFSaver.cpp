@@ -725,18 +725,18 @@ int CSaverCGF::SaveNodeMesh(
 		const int vertexCount = mesh.GetVertexCount();
 		bool bInterleaved = false;
 
-		if (m_bCompactVertexStreams && mesh.m_pPositions && mesh.m_pColor0 && mesh.m_pTexCoord)
+		if (m_bCompactVertexStreams && mesh.m_pPositions && mesh.m_pColors && mesh.m_pTexCoord)
 		{
-			std::vector<SVF_P3S_C4B_T2S> interleavedVertices(vertexCount);
+			std::vector<SVF_P3H_C4B_T2H> interleavedVertices(vertexCount);
 			memset(&interleavedVertices[0], 0, sizeof(interleavedVertices[0]) * interleavedVertices.size());
 
 			const Vec3* const pPositions = mesh.m_pPositions;
-			const SMeshColor* const pColors = mesh.m_pColor0;
+			const SMeshColor* const pColors = mesh.m_pColors;
 			const SMeshTexCoord* const pTexCoords = mesh.m_pTexCoord;
 
 			for (int vi = 0; vi < vertexCount; ++vi)
 			{
-				SVF_P3S_C4B_T2S& vert = interleavedVertices[vi];
+				SVF_P3H_C4B_T2H& vert = interleavedVertices[vi];
 				const ColorB clr = pColors[vi].GetRGBA();
 				const Vec2 uv = pTexCoords[vi].GetUV();
 
@@ -782,11 +782,11 @@ int CSaverCGF::SaveNodeMesh(
 			}
 		}
 
-		if (mesh.m_pNorms && !m_bCompactVertexStreams)
+		if (mesh.m_pNormals && !m_bCompactVertexStreams)
 		{
-			SwapEndian(mesh.m_pNorms, vertexCount, bSwapEndian);
-			chunk.nStreamChunkID[CGF_STREAM_NORMALS] = SaveStreamDataChunk(mesh.m_pNorms, CGF_STREAM_NORMALS, vertexCount, sizeof(Vec3), bSwapEndian);
-			SwapEndian(mesh.m_pNorms, vertexCount, bSwapEndian);
+			SwapEndian(mesh.m_pNormals, vertexCount, bSwapEndian);
+			chunk.nStreamChunkID[CGF_STREAM_NORMALS] = SaveStreamDataChunk(mesh.m_pNormals, CGF_STREAM_NORMALS, vertexCount, sizeof(Vec3), bSwapEndian);
+			SwapEndian(mesh.m_pNormals, vertexCount, bSwapEndian);
 		}
 
 		if (mesh.m_pTexCoord && !bInterleaved)
@@ -796,25 +796,18 @@ int CSaverCGF::SaveNodeMesh(
 			SwapEndian(mesh.m_pTexCoord, mesh.GetTexCoordCount(), bSwapEndian);
 		}
 
-		if (mesh.m_pColor0 && !bInterleaved)
+		if (mesh.m_pColors && !bInterleaved)
 		{
-			SwapEndian(mesh.m_pColor0, vertexCount, bSwapEndian);
-			chunk.nStreamChunkID[CGF_STREAM_COLORS] = SaveStreamDataChunk(mesh.m_pColor0, CGF_STREAM_COLORS, vertexCount, sizeof(SMeshColor), bSwapEndian);
-			SwapEndian(mesh.m_pColor0, vertexCount, bSwapEndian);
+			SwapEndian(mesh.m_pColors, vertexCount, bSwapEndian);
+			chunk.nStreamChunkID[CGF_STREAM_COLORS] = SaveStreamDataChunk(mesh.m_pColors, CGF_STREAM_COLORS, vertexCount, sizeof(SMeshColor), bSwapEndian);
+			SwapEndian(mesh.m_pColors, vertexCount, bSwapEndian);
 		}
 
-		if (mesh.m_pColor1)
+		if (mesh.m_pSubsetIds)
 		{
-			SwapEndian(mesh.m_pColor1, vertexCount, bSwapEndian);
-			chunk.nStreamChunkID[CGF_STREAM_COLORS2] = SaveStreamDataChunk(mesh.m_pColor1, CGF_STREAM_COLORS2, vertexCount, sizeof(SMeshColor), bSwapEndian);
-			SwapEndian(mesh.m_pColor1, vertexCount, bSwapEndian);
-		}
-
-		if (mesh.m_pVertMats)
-		{
-			SwapEndian(mesh.m_pVertMats, vertexCount, bSwapEndian);
-			chunk.nStreamChunkID[CGF_STREAM_VERT_MATS] = SaveStreamDataChunk(mesh.m_pVertMats, CGF_STREAM_VERT_MATS, vertexCount, sizeof(mesh.m_pVertMats[0]), bSwapEndian);
-			SwapEndian(mesh.m_pVertMats, vertexCount, bSwapEndian);
+			SwapEndian(mesh.m_pSubsetIds, vertexCount, bSwapEndian);
+			chunk.nStreamChunkID[CGF_STREAM_SUBSETIDS] = SaveStreamDataChunk(mesh.m_pSubsetIds, CGF_STREAM_SUBSETIDS, vertexCount, sizeof(mesh.m_pSubsetIds[0]), bSwapEndian);
+			SwapEndian(mesh.m_pSubsetIds, vertexCount, bSwapEndian);
 		}
 
 		if (mesh.m_pIndices)
@@ -935,7 +928,7 @@ int CSaverCGF::SaveUncompiledNodeMesh(CNodeCGF* pNode)
 	const CMesh* const mesh = pNode->pMesh;
 
 	const bool HasBoneInfo = (mesh->m_pBoneMapping != 0);
-	const bool HasVertexColors = (mesh->m_pColor0 != 0);
+	const bool HasVertexColors = (mesh->m_pColors != 0);
 	const bool HasVertexAlphas = HasVertexColors;
 	const bool WriteVCol = true;
 
@@ -960,7 +953,7 @@ int CSaverCGF::SaveUncompiledNodeMesh(CNodeCGF* pNode)
 	}
 
 	assert(mesh->m_pPositions);
-	assert(mesh->m_pNorms);
+	assert(mesh->m_pNormals);
 	assert(mesh->m_pFaces);
 
 	chunk.flags1 = 0;
@@ -983,7 +976,7 @@ int CSaverCGF::SaveUncompiledNodeMesh(CNodeCGF* pNode)
 		for (int i = 0; i < numVertices; i++)
 		{
 			vertices[i].p = mesh->m_pPositions[i];
-			vertices[i].n = mesh->m_pNorms[i].GetN();
+			vertices[i].n = mesh->m_pNormals[i].GetN();
 		}
 		chunkData.AddData(vertices, numVertices * sizeof(CryVertex));
 		SAFE_DELETE_ARRAY(vertices);
@@ -1121,7 +1114,7 @@ int CSaverCGF::SaveUncompiledNodeMesh(CNodeCGF* pNode)
 			CryIRGB* vertexcolors = new CryIRGB[numVertices];
 			for (int i = 0; i < numVertices; i++)
 			{
-				const ColorB clr = mesh->m_pColor0[i].GetRGBA();
+				const ColorB clr = mesh->m_pColors[i].GetRGBA();
 
 				vertexcolors[i].r = clr.r;
 				vertexcolors[i].g = clr.g;
@@ -1136,7 +1129,7 @@ int CSaverCGF::SaveUncompiledNodeMesh(CNodeCGF* pNode)
 			unsigned char* vertexalphas = new unsigned char[numVertices];
 			for (int i = 0; i < numVertices; i++)
 			{
-				const ColorB clr = mesh->m_pColor0[i].GetRGBA();
+				const ColorB clr = mesh->m_pColors[i].GetRGBA();
 
 				vertexalphas[i] = clr.a;
 			}

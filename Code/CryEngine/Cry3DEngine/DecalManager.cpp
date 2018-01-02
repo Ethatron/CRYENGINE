@@ -1380,11 +1380,11 @@ _smart_ptr<IRenderMesh> CDecalManager::MakeBigDecalRenderMesh(IRenderMesh* pSour
 		return 0;
 
 	// make fake vert buffer with one vertex // todo: remove this
-	PodArray<SVF_P3S_C4B_T2S> EmptyVertBuffer;
-	EmptyVertBuffer.Add(SVF_P3S_C4B_T2S());
+	PodArray<SVF_P3H_C4B_T2H> EmptyVertBuffer;
+	EmptyVertBuffer.Add(SVF_P3H_C4B_T2H());
 
 	_smart_ptr<IRenderMesh> pRenderMesh = 0;
-	pRenderMesh = GetRenderer()->CreateRenderMeshInitialized(EmptyVertBuffer.GetElements(), EmptyVertBuffer.Count(), EDefaultInputLayouts::P3S_C4B_T2S,
+	pRenderMesh = GetRenderer()->CreateRenderMeshInitialized(EmptyVertBuffer.GetElements(), EmptyVertBuffer.Count(), EDefaultInputLayouts::P3H_C4B_T2H,
 	                                                         lstIndices.GetElements(), lstIndices.Count(), prtTriangleList, "BigDecalOnStatObj", "BigDecal", eRMT_Static, 1, 0, 0, 0, false, false, 0);
 	pRenderMesh->SetVertexContainer(pSourceRenderMesh);
 	pRenderMesh->SetChunk(pDecalMat, 0, pSourceRenderMesh->GetVerticesCount(), 0, lstIndices.Count(), texelAreaDensity);

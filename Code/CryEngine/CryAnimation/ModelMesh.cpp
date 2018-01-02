@@ -134,8 +134,8 @@ ClosestTri CModelMesh::GetAttachmentTriangle(const Vec3& RMWPosition, const Join
 	{
 		uint32 e = pIndices[foundPos + t];
 		Vec3 hwPosition = *(Vec3*)(pPositions + e * nPositionStride);
-		uint16* hwBoneIDs = ((SVF_W4B_I4S*)(pSkinningInfo + e * nSkinningStride))->indices;
-		ColorB hwWeights = *(ColorB*)&((SVF_W4B_I4S*)(pSkinningInfo + e * nSkinningStride))->weights;
+		uint16* hwBoneIDs = ((SVF_W4B_I4U*)(pSkinningInfo + e * nSkinningStride))->indices;
+		ColorB hwWeights = *(ColorB*)&((SVF_W4B_I4U*)(pSkinningInfo + e * nSkinningStride))->weights;
 		cf.v[t].m_attTriPos = hwPosition + m_vRenderMeshOffset;
 		cf.v[t].m_attWeights[0] = hwWeights[0] / 255.0f;
 		cf.v[t].m_attWeights[1] = hwWeights[1] / 255.0f;

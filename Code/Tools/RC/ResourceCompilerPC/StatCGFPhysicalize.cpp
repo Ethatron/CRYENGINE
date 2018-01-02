@@ -684,11 +684,10 @@ bool CPhysicsInterface::DeletePhysicalProxySubsets(CNodeCGF* pNodeCGF, bool cons
 		mesh.RemoveRangeFromStream(CMesh::POSITIONS,   nFirstVertexId, nNumVertices);
 		mesh.RemoveRangeFromStream(CMesh::NORMALS,     nFirstVertexId, nNumVertices);
 		mesh.RemoveRangeFromStream(CMesh::TEXCOORDS,   nFirstVertexId, nNumVertices);
-		mesh.RemoveRangeFromStream(CMesh::COLORS_0,    nFirstVertexId, nNumVertices);
-		mesh.RemoveRangeFromStream(CMesh::COLORS_1,    nFirstVertexId, nNumVertices);
+		mesh.RemoveRangeFromStream(CMesh::COLORS,      nFirstVertexId, nNumVertices);
 		mesh.RemoveRangeFromStream(CMesh::TANGENTS,    nFirstVertexId, nNumVertices);
 		mesh.RemoveRangeFromStream(CMesh::BONEMAPPING, nFirstVertexId, nNumVertices);
-		mesh.RemoveRangeFromStream(CMesh::VERT_MATS,   nFirstVertexId, nNumVertices);
+		mesh.RemoveRangeFromStream(CMesh::SUBSET_IDS,  nFirstVertexId, nNumVertices);
 		mesh.RemoveRangeFromStream(CMesh::QTANGENTS,   nFirstVertexId, nNumVertices);
 
 		// Erase subset.

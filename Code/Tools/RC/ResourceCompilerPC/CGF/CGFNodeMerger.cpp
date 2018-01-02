@@ -83,17 +83,11 @@ bool CGFNodeMerger::MergeNodes(const CContentCGF* pCGF, const std::vector<CNodeC
 				return false;
 			}
 			// Keep color stream in sync size with vertex/normals stream.
-			if (pMergedMesh->m_streamSize[CMesh::COLORS_0] > 0 && pMergedMesh->m_streamSize[CMesh::COLORS_0] < oldVertexCount)
+			if (pMergedMesh->m_streamSize[CMesh::COLORS] > 0 && pMergedMesh->m_streamSize[CMesh::COLORS] < oldVertexCount)
 			{
-				const int count = pMergedMesh->m_streamSize[CMesh::COLORS_0];
-				pMergedMesh->ReallocStream(CMesh::COLORS_0, oldVertexCount);
-				memset(pMergedMesh->m_pColor0 + count, 255, (oldVertexCount - count) * sizeof(SMeshColor));
-			}
-			if (pMergedMesh->m_streamSize[CMesh::COLORS_1] > 0 && pMergedMesh->m_streamSize[CMesh::COLORS_1] < oldVertexCount)
-			{
-				const int count = pMergedMesh->m_streamSize[CMesh::COLORS_1];
-				pMergedMesh->ReallocStream(CMesh::COLORS_1, oldVertexCount);
-				memset(pMergedMesh->m_pColor1 + count, 255, (oldVertexCount - count) * sizeof(SMeshColor));
+				const int count = pMergedMesh->m_streamSize[CMesh::COLORS];
+				pMergedMesh->ReallocStream(CMesh::COLORS, oldVertexCount);
+				memset(pMergedMesh->m_pColors + count, 255, (oldVertexCount - count) * sizeof(SMeshColor));
 			}
 		}
 
@@ -114,7 +108,7 @@ bool CGFNodeMerger::MergeNodes(const CContentCGF* pCGF, const std::vector<CNodeC
 			for (int j = oldVertexCount; j < pMergedMesh->GetVertexCount(); ++j)
 			{
 				pMergedMesh->m_pPositions[j] = pNode->worldTM.TransformPoint(pMergedMesh->m_pPositions[j]);
-				pMergedMesh->m_pNorms[j].RotateSafelyBy(pNode->worldTM);
+				pMergedMesh->m_pNormals[j].RotateSafelyBy(pNode->worldTM);
 			}
 		}
 	}

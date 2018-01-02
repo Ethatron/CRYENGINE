@@ -61,10 +61,10 @@ CAttachmentMerger::MeshStreams::~MeshStreams()
 	pMesh->UnLockForThreadAccess();
 }
 
-SVF_W4B_I4S& CAttachmentMerger::MeshStreams::GetSkinningInfo(int nVtxIndex)
+SVF_W4B_I4U& CAttachmentMerger::MeshStreams::GetSkinningInfo(vtx_idx nVtxIndex)
 {
 	CRY_ASSERT(nVtxIndex < pMesh->GetVerticesCount());
-	return static_cast<SVF_W4B_I4S*>(pSkinningInfos)[nVtxIndex];
+	return static_cast<SVF_W4B_I4U*>(pSkinningInfos)[nVtxIndex];
 }
 
 vtx_idx& CAttachmentMerger::MeshStreams::GetVertexIndex(int i)
@@ -136,7 +136,7 @@ void CAttachmentMerger::MergeContext::Update(const AttachmentRenderData& renderD
 
 uint CAttachmentMerger::MergeContext::EstimateRequiredMemory() const
 {
-	const uint nVertexSize = sizeof(SVF_P3F) + sizeof(SVF_W4B_I4S);
+	const uint nVertexSize = sizeof(SVF_P3F) + sizeof(SVF_W4B_I4U);
 	const uint nIndexSize = sizeof(vtx_idx) * 2;  // index buffer is cached CPU side
 
 	uint nResult = 0;
@@ -404,8 +404,8 @@ uint CopyVertices(CAttachmentMerger::MeshStreams& dstStreams, uint dstVtxOffset,
 {
 	InputLayoutHandle sVF = srcStreams.GetVertexFormat();
 
-	if (sVF == EDefaultInputLayouts::P3S_C4B_T2S)
-		CopyVertices_tpl<SVF_P3S_C4B_T2S, RequiresTransform>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
+	if (sVF == EDefaultInputLayouts::P3H_C4B_T2H)
+		CopyVertices_tpl<SVF_P3H_C4B_T2H, RequiresTransform>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
 	else if (sVF == EDefaultInputLayouts::P3F_C4B_T2F)
 		CopyVertices_tpl<SVF_P3F_C4B_T2F, RequiresTransform>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
 	else if (sVF == EDefaultInputLayouts::P3F)
@@ -475,7 +475,7 @@ uint CAttachmentMerger::CopySkinning(MeshStreams& dstStreams, uint dstVtxOffset,
 
 	for (uint k = 0; k < numVertices; ++k)
 	{
-		const SVF_W4B_I4S& srcSkinningInfo = srcStreams.GetSkinningInfo(k);
+		const SVF_W4B_I4U& srcSkinningInfo = srcStreams.GetSkinningInfo(k);
 
 		JointIdType id0 = srcSkinningInfo.indices[0];
 		JointIdType id1 = srcSkinningInfo.indices[1];
@@ -494,7 +494,7 @@ uint CAttachmentMerger::CopySkinning(MeshStreams& dstStreams, uint dstVtxOffset,
 
 		CRY_ASSERT(maxBoneIndex <= std::numeric_limits<JointIdType>::max());
 
-		SVF_W4B_I4S& dstSkinningInfo = dstStreams.GetSkinningInfo(k + dstVtxOffset);
+		SVF_W4B_I4U& dstSkinningInfo = dstStreams.GetSkinningInfo(k + dstVtxOffset);
 
 		dstSkinningInfo.weights = srcSkinningInfo.weights;
 		dstSkinningInfo.indices[0] = id0;
@@ -512,7 +512,7 @@ void CAttachmentMerger::SkinToBone(MeshStreams& dstStreams, uint dstVtxOffset, M
 
 	for (uint k = 0; k < numVertices; ++k)
 	{
-		SVF_W4B_I4S& dstSkinningInfo = dstStreams.GetSkinningInfo(k + dstVtxOffset);
+		SVF_W4B_I4U& dstSkinningInfo = dstStreams.GetSkinningInfo(k + dstVtxOffset);
 
 		dstSkinningInfo.weights.bcolor[0] = 255;
 		dstSkinningInfo.weights.bcolor[1] = 0;

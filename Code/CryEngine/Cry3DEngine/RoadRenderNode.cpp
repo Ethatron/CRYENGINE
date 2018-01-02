@@ -18,7 +18,7 @@ const float fRoadTerrainZOffset = 0.06f;
 PodArray<Vec3> CRoadRenderNode::s_tempVertexPositions;
 PodArray<vtx_idx> CRoadRenderNode::s_tempIndices;
 PodArray<SPipTangents> CRoadRenderNode::s_tempTangents;
-PodArray<SVF_P3F_C4B_T2S> CRoadRenderNode::s_tempVertices;
+PodArray<SVF_P3F_C4B_T2H> CRoadRenderNode::s_tempVertices;
 CPolygonClipContext CRoadRenderNode::s_tmpClipContext;
 ILINE Vec3 max(const Vec3& v0, const Vec3& v1) { return Vec3(max(v0.x, v1.x), max(v0.y, v1.y), max(v0.z, v1.z)); }
 ILINE Vec3 min(const Vec3& v0, const Vec3& v1) { return Vec3(min(v0.x, v1.x), min(v0.y, v1.y), min(v0.z, v1.z)); }
@@ -326,7 +326,7 @@ void CRoadRenderNode::Compile() PREFAST_SUPPRESS_WARNING(6262) //function uses >
 			s_tempVertices.Clear();
 			for (int i = 0; i < s_tempVertexPositions.Count(); i++)
 			{
-				SVF_P3F_C4B_T2S tmp;
+				SVF_P3F_C4B_T2H tmp;
 
 				Vec3 vWSPos = s_tempVertexPositions[i];
 
@@ -395,7 +395,7 @@ void CRoadRenderNode::Compile() PREFAST_SUPPRESS_WARNING(6262) //function uses >
 	if (m_dynamicData.indices.Count() && GetRenderer())
 	{
 		m_pRenderMesh = GetRenderer()->CreateRenderMeshInitialized(
-		  m_dynamicData.vertices.GetElements(), m_dynamicData.vertices.Count(), EDefaultInputLayouts::P3F_C4B_T2S,
+		  m_dynamicData.vertices.GetElements(), m_dynamicData.vertices.Count(), EDefaultInputLayouts::P3F_C4B_T2H,
 		  m_dynamicData.indices.GetElements(), m_dynamicData.indices.Count(), prtTriangleList,
 		  "RoadRenderNode", GetName(), eRMT_Static, 1, 0, NULL, NULL, false, true, m_dynamicData.tangents.GetElements());
 

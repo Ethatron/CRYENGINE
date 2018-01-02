@@ -599,10 +599,10 @@ static inline size_t CullInstanceList(
 // Update a set of vertices to be worldspace and merge a deformation stream into
 // them
 static inline void UpdateGeneral(
-  SVF_P3S_C4B_T2S* out
+  SVF_P3H_C4B_T2H* out
   , SVF_P3F_C4B_T2F* in
   , SMMRMDeformVertex* deform
-  , uint16* mapping
+  , vtx_idx* mapping
   , Matrix34 tmat
   , size_t count)
 {
@@ -618,7 +618,7 @@ static inline void UpdateGeneral(
 ////////////////////////////////////////////////////////////////////////////////
 // Update a set of vertices to be worldspace
 static inline void UpdateGeneral(
-  SVF_P3S_C4B_T2S* out
+  SVF_P3H_C4B_T2H* out
   , SVF_P3F_C4B_T2F* in
   , const Matrix34& wmat)
 {
@@ -628,7 +628,7 @@ static inline void UpdateGeneral(
 	out->st = in->st;
 }
 static inline void UpdateGeneral(
-  SVF_P3S_C4B_T2S* out
+  SVF_P3H_C4B_T2H* out
   , SVF_P3F_C4B_T2F* in
   , const Matrix34& wmat
   , size_t count)
@@ -659,26 +659,26 @@ static inline void UpdateGeneral(
 ////////////////////////////////////////////////////////////////////////////////
 // Skin a set of normals against a set of bones
 static inline void UpdateNormals(
-  Vec3f16* out
+  SPipNormal* out
   , Vec3* in
   , size_t count)
 {
 	MMRM_PROFILE_FUNCTION(gEnv->pSystem, PROFILE_3DENGINE);
 	for (size_t i = 0; i < (count & ~3); i += 4)
 	{
-		out[i + 0] = in[i + 0];
-		out[i + 1] = in[i + 1];
-		out[i + 2] = in[i + 2];
-		out[i + 3] = in[i + 3];
+		out[i + 0] = SPipNormal(in[i + 0]);
+		out[i + 1] = SPipNormal(in[i + 1]);
+		out[i + 2] = SPipNormal(in[i + 2]);
+		out[i + 3] = SPipNormal(in[i + 3]);
 	}
 	for (size_t i = (count & ~3); i < count; ++i)
 	{
-		out[i] = in[i];
+		out[i] = SPipNormal(in[i]);
 	}
 }
 
 static inline void UpdateNormals(
-  Vec3f16* out
+  SPipNormal* out
   , Vec3* in
   , DualQuatA* bones
   , SMMRMBoneMapping* weights
@@ -769,10 +769,10 @@ static inline void UpdateNormals(
 		_mm_store_ps((float*)&wq[3].nq, _mm_mul_ps(_wq[3 * 2 + 0], nq_len[3]));
 		_mm_store_ps((float*)&wq[3].dq, _mm_mul_ps(_wq[3 * 2 + 1], nq_len[3]));
 
-		out[i + 0] = wq[0].nq * in[i + 0];
-		out[i + 1] = wq[1].nq * in[i + 1];
-		out[i + 2] = wq[2].nq * in[i + 2];
-		out[i + 3] = wq[3].nq * in[i + 3];
+		out[i + 0] = SPipNormal(wq[0].nq * in[i + 0]);
+		out[i + 1] = SPipNormal(wq[1].nq * in[i + 1]);
+		out[i + 2] = SPipNormal(wq[2].nq * in[i + 2]);
+		out[i + 3] = SPipNormal(wq[3].nq * in[i + 3]);
 	}
 	for (size_t i = (count & ~3); i < count; ++i)
 	{
@@ -800,7 +800,7 @@ static inline void UpdateNormals(
 		nq_len[0] = _mm_rsqrt_ps(DotProduct4(_wq[0 * 2 + 0], _wq[0 * 2 + 0]));
 		_mm_store_ps((float*)&wq[0].nq, _mm_mul_ps(_wq[0 * 2 + 0], nq_len[0]));
 		_mm_store_ps((float*)&wq[0].dq, _mm_mul_ps(_wq[0 * 2 + 1], nq_len[0]));
-		out[i + 0] = wq[0].nq * in[i + 0];
+		out[i + 0] = SPipNormal(wq[0].nq * in[i + 0]);
 	}
 #else
 	DualQuatA wq[4];
@@ -847,10 +847,10 @@ static inline void UpdateNormals(
 		wq[2].nq *= l[2];
 		wq[3].nq *= l[3];
 
-		out[i + 0] = wq[0].nq * in[i + 0];
-		out[i + 1] = wq[1].nq * in[i + 1];
-		out[i + 2] = wq[2].nq * in[i + 2];
-		out[i + 3] = wq[3].nq * in[i + 3];
+		out[i + 0] = SPipNormal(wq[0].nq * in[i + 0]);
+		out[i + 1] = SPipNormal(wq[1].nq * in[i + 1]);
+		out[i + 2] = SPipNormal(wq[2].nq * in[i + 2]);
+		out[i + 3] = SPipNormal(wq[3].nq * in[i + 3]);
 	}
 	for (size_t i = (count & ~3); i < count; ++i)
 	{
@@ -869,7 +869,7 @@ static inline void UpdateNormals(
 		l[0] = wq[0].nq.GetLength();
 		l[0] = l[0] > 0.f ? 1.f / (l[0]) : l[0];
 		wq[0].nq *= l[0];
-		out[i + 0] = wq[0].nq * in[i + 0];
+		out[i + 0] = SPipNormal(wq[0].nq * in[i + 0]);
 	}
 #endif
 }
@@ -877,7 +877,7 @@ static inline void UpdateNormals(
 ////////////////////////////////////////////////////////////////////////////////
 // Skin a set of vertices against a set of bones
 static inline void UpdateGeneral(
-  SVF_P3S_C4B_T2S* out
+  SVF_P3H_C4B_T2H* out
   , SVF_P3F_C4B_T2F* in
   , DualQuatA* bones
   , SMMRMBoneMapping* weights
@@ -903,7 +903,7 @@ static inline void UpdateGeneral(
 	out->st = in->st;
 }
 static inline void UpdateGeneral(
-  SVF_P3S_C4B_T2S* out
+  SVF_P3H_C4B_T2H* out
   , SVF_P3F_C4B_T2F* in
   , DualQuatA* bones
   , SMMRMBoneMapping* weights
@@ -1455,7 +1455,7 @@ static inline void UpdateTangents(SPipTangents* out, SPipQTangents* in, const Ma
 ////////////////////////////////////////////////////////////////////////////////
 // Update a set of general, tangents and normals
 static inline void UpdateGeneralTangents(
-  SVF_P3S_C4B_T2S* out_general
+  SVF_P3H_C4B_T2H* out_general
   , SPipTangents* out_packed_tangents
   , SVF_P3F_C4B_T2F* in_general
   , SPipQTangents* in_packed_tangents
@@ -1770,12 +1770,12 @@ static inline void UpdateGeneralTangents(
 }
 
 static inline void UpdateGeneralTangentsNormals(
-  SVF_P3S_C4B_T2S* out_general
+  SVF_P3H_C4B_T2H* out_general
   , SPipTangents* out_packed_tangents
-  , Vec3f16* out_normals
+  , SPipNormal* out_packed_normals
   , SVF_P3F_C4B_T2F* in_general
   , SPipQTangents* in_packed_tangents
-  , Vec3* in_normals
+  , SPipNormal* in_packed_normals
   , DualQuatA* bones
   , SMMRMBoneMapping* weights
   , const float fScale
@@ -1794,6 +1794,8 @@ static inline void UpdateGeneralTangentsNormals(
 	__m128 ot[4];
 	CRY_ALIGN(16) Quat out_tangents[4];
 	CRY_ALIGN(16) Quat in_tangents[4];
+	CRY_ALIGN(16) Vec3 out_normals[4];
+	CRY_ALIGN(16) Vec3 in_normals[4];
 	#if MMRM_UNROLL_GEOMETRY_BAKING_LOOPS
 	for (size_t i = 0; i < (count & ~3); i += 4)
 	{
@@ -1803,6 +1805,11 @@ static inline void UpdateGeneralTangentsNormals(
 		in_tangents[1] = in_packed_tangents[i + 1].GetQ();
 		in_tangents[2] = in_packed_tangents[i + 2].GetQ();
 		in_tangents[3] = in_packed_tangents[i + 3].GetQ();
+
+		in_normals[0] = in_packed_normals[i + 0].GetN();
+		in_normals[1] = in_packed_normals[i + 1].GetN();
+		in_normals[2] = in_packed_normals[i + 2].GetN();
+		in_normals[3] = in_packed_normals[i + 3].GetN();
 
 		vweights[0] = _mm_load_ps(&weights[i + 0].weights[0]);
 		vweights[1] = _mm_load_ps(&weights[i + 1].weights[0]);
@@ -1899,6 +1906,11 @@ static inline void UpdateGeneralTangentsNormals(
 		out_tangents[2] = (wq[2].nq * in_tangents[2]);
 		out_tangents[3] = (wq[3].nq * in_tangents[3]);
 
+		out_normals[0] = (wq[0].nq * in_normals[0]);
+		out_normals[1] = (wq[1].nq * in_normals[1]);
+		out_normals[2] = (wq[2].nq * in_normals[2]);
+		out_normals[3] = (wq[3].nq * in_normals[3]);
+
 		if (out_tangents[0].w < 0.f) out_tangents[0] = -out_tangents[0];
 		if (out_tangents[1].w < 0.f) out_tangents[1] = -out_tangents[1];
 		if (out_tangents[2].w < 0.f) out_tangents[2] = -out_tangents[2];
@@ -1919,10 +1931,10 @@ static inline void UpdateGeneralTangentsNormals(
 		out_packed_tangents[i + 2] = SPipTangents(out_tangents[2], flip[2]);
 		out_packed_tangents[i + 3] = SPipTangents(out_tangents[3], flip[3]);
 
-		CvtToHalf(out_normals[i + 0], wq[0].nq * in_normals[i + 0]);
-		CvtToHalf(out_normals[i + 1], wq[0].nq * in_normals[i + 1]);
-		CvtToHalf(out_normals[i + 2], wq[0].nq * in_normals[i + 2]);
-		CvtToHalf(out_normals[i + 3], wq[0].nq * in_normals[i + 3]);
+		out_packed_normals[i + 0] = SPipNormal(out_normals[0]);
+		out_packed_normals[i + 1] = SPipNormal(out_normals[1]);
+		out_packed_normals[i + 2] = SPipNormal(out_normals[2]);
+		out_packed_normals[i + 3] = SPipNormal(out_normals[3]);
 	}
 	for (size_t i = (count & ~3); i < count; ++i)
 	#else // MMRM_UNROLL_GEOMETRY_BAKING_LOOPS
@@ -1931,6 +1943,7 @@ static inline void UpdateGeneralTangentsNormals(
 	{
 		_wq[0] = _wq[1] = _mm_xor_ps(_wq[0], _wq[0]);
 		in_tangents[0] = in_packed_tangents[i + 0].GetQ();
+		in_normals[0] = in_packed_normals[i + 0].GetN();
 		vweights[0] = _mm_load_ps(&weights[i + 0].weights[0]);
 		switch (maxSpines)
 		{
@@ -1958,18 +1971,19 @@ static inline void UpdateGeneralTangentsNormals(
 		out_general[i + 0].color = in_general[i + 0].color;
 		CvtToHalf(out_general[i + 0].st, in_general[i + 0].st);
 		out_tangents[0] = (wq[0].nq * in_tangents[0]);
-
+		out_normals[0] = (wq[0].nq * in_normals[0]);
 		if (out_tangents[0].w < 0.f) out_tangents[0] = -out_tangents[0];
 		flip[0] = in_tangents[0].w < 0.f ? -1 : 1;
 		if (flip[0] < 0) out_tangents[0] = -out_tangents[0];
 		out_packed_tangents[i + 0] = SPipTangents(out_tangents[0], flip[0]);
-
-		CvtToHalf(out_normals[i + 0], wq[0].nq * in_normals[i + 0]);
+		out_packed_normals[i + 0] = SPipNormal(out_normals[0]);
 	}
 #else
 	float l[4];
 	Quat out_tangents[4];
 	Quat in_tangents[4];
+	Vec3 out_normals[4];
+	Vec3 in_normals[4];
 	DualQuatA wq[4];
 	int16 flip[4];
 	for (size_t i = 0; i < (count & ~3); i += 4)
@@ -1979,6 +1993,11 @@ static inline void UpdateGeneralTangentsNormals(
 		in_tangents[1] = in_packed_tangents[i + 1].GetQ();
 		in_tangents[2] = in_packed_tangents[i + 2].GetQ();
 		in_tangents[3] = in_packed_tangents[i + 3].GetQ();
+
+		in_normals[0] = in_packed_normals[i + 0].GetN();
+		in_normals[1] = in_packed_normals[i + 1].GetN();
+		in_normals[2] = in_packed_normals[i + 2].GetN();
+		in_normals[3] = in_packed_normals[i + 3].GetN();
 		switch (maxSpines)
 		{
 		case 4:
@@ -2044,6 +2063,11 @@ static inline void UpdateGeneralTangentsNormals(
 		out_tangents[2] = (wq[2].nq * in_tangents[2]);
 		out_tangents[3] = (wq[3].nq * in_tangents[3]);
 
+		out_normals[0] = (wq[0].nq * in_normals[0]);
+		out_normals[1] = (wq[1].nq * in_normals[1]);
+		out_normals[2] = (wq[2].nq * in_normals[2]);
+		out_normals[3] = (wq[3].nq * in_normals[3]);
+
 		if (out_tangents[0].w < 0.f) out_tangents[0] = -out_tangents[0];
 		if (out_tangents[1].w < 0.f) out_tangents[1] = -out_tangents[1];
 		if (out_tangents[2].w < 0.f) out_tangents[2] = -out_tangents[2];
@@ -2064,15 +2088,16 @@ static inline void UpdateGeneralTangentsNormals(
 		out_packed_tangents[i + 2] = SPipTangents(out_tangents[2], flip[2]);
 		out_packed_tangents[i + 3] = SPipTangents(out_tangents[3], flip[3]);
 
-		out_normals[i + 0] = wq[0].nq * in_normals[i + 0];
-		out_normals[i + 0] = wq[0].nq * in_normals[i + 0];
-		out_normals[i + 0] = wq[0].nq * in_normals[i + 0];
-		out_normals[i + 0] = wq[0].nq * in_normals[i + 0];
+		out_packed_normals[i + 0] = SPipNormal(out_normals[0]);
+		out_packed_normals[i + 1] = SPipNormal(out_normals[1]);
+		out_packed_normals[i + 2] = SPipNormal(out_normals[2]);
+		out_packed_normals[i + 3] = SPipNormal(out_normals[3]);
 	}
 	for (size_t i = (count & ~3); i < count; ++i)
 	{
 		wq[0] = DualQuatA(ZERO);
 		in_tangents[0] = in_packed_tangents[i + 0].GetQ();
+		in_normals[0] = in_packed_normals[i + 0].GetN();
 		switch (maxSpines)
 		{
 		case 4:
@@ -2093,11 +2118,12 @@ static inline void UpdateGeneralTangentsNormals(
 		out_general[i + 0].color = in_general[i + 0].color;
 		out_general[i + 0].st = in_general[i + 0].st;
 		out_tangents[0] = (wq[0].nq * in_tangents[0]);
+		out_normals[0] = (wq[0].nq * in_normals[0]);
 		if (out_tangents[0].w < 0.f) out_tangents[0] = -out_tangents[0];
 		flip[0] = in_tangents[0].w < 0.f ? -1 : 1;
 		if (flip[0] < 0) out_tangents[0] = -out_tangents[0];
 		out_packed_tangents[i + 0] = SPipTangents(out_tangents[0], flip[0]);
-		out_normals[i + 0] = wq[0].nq * in_normals[i + 0];
+		out_packed_normals[i + 0] = SPipNormal(out_normals[0]);
 	}
 #endif
 }
@@ -2105,7 +2131,7 @@ static inline void UpdateGeneralTangentsNormals(
 ////////////////////////////////////////////////////////////////////////////////
 // Update a set of general, tangents and normals
 static inline void UpdateGeneralTangents(
-  SVF_P3S_C4B_T2S* out_general
+  SVF_P3H_C4B_T2H* out_general
   , SPipTangents* out_packed_tangents
   , SMMRMSkinVertex* in
   , DualQuatA* bones
@@ -2424,9 +2450,9 @@ static inline void UpdateGeneralTangents(
 }
 
 static inline void UpdateGeneralTangentsNormals(
-  SVF_P3S_C4B_T2S* out_general
+  SVF_P3H_C4B_T2H* out_general
   , SPipTangents* out_packed_tangents
-  , Vec3f16* out_normals
+  , SPipNormal* out_packed_normals
   , SMMRMSkinVertex* in
   , DualQuatA* bones
   , const float fScale
@@ -2445,6 +2471,8 @@ static inline void UpdateGeneralTangentsNormals(
 	__m128 ot[4];
 	CRY_ALIGN(16) Quat out_tangents[4];
 	CRY_ALIGN(16) Quat in_tangents[4];
+	CRY_ALIGN(16) Vec3 out_normals[4];
+	CRY_ALIGN(16) Vec3 in_normals[4];
 	#if MMRM_UNROLL_GEOMETRY_BAKING_LOOPS
 	for (size_t i = 0; i < (count & ~3); i += 4)
 	{
@@ -2458,6 +2486,11 @@ static inline void UpdateGeneralTangentsNormals(
 		in_tangents[1] = in[i + 1].qt.GetQ();
 		in_tangents[2] = in[i + 2].qt.GetQ();
 		in_tangents[3] = in[i + 3].qt.GetQ();
+
+		in_normals[0] = in[i + 0].normal.GetN();
+		in_normals[1] = in[i + 1].normal.GetN();
+		in_normals[2] = in[i + 2].normal.GetN();
+		in_normals[3] = in[i + 3].normal.GetN();
 
 		vweights[0] = _mm_load_ps(&in[i + 0].weights[0]);
 		vweights[1] = _mm_load_ps(&in[i + 1].weights[0]);
@@ -2554,6 +2587,11 @@ static inline void UpdateGeneralTangentsNormals(
 		out_tangents[2] = (wq[2].nq * in_tangents[2]);
 		out_tangents[3] = (wq[3].nq * in_tangents[3]);
 
+		out_normals[0] = (wq[0].nq * in_normals[0]);
+		out_normals[1] = (wq[1].nq * in_normals[1]);
+		out_normals[2] = (wq[2].nq * in_normals[2]);
+		out_normals[3] = (wq[3].nq * in_normals[3]);
+
 		if (out_tangents[0].w < 0.f) out_tangents[0] = -out_tangents[0];
 		if (out_tangents[1].w < 0.f) out_tangents[1] = -out_tangents[1];
 		if (out_tangents[2].w < 0.f) out_tangents[2] = -out_tangents[2];
@@ -2574,10 +2612,10 @@ static inline void UpdateGeneralTangentsNormals(
 		out_packed_tangents[i + 2] = SPipTangents(out_tangents[2], flip[2]);
 		out_packed_tangents[i + 3] = SPipTangents(out_tangents[3], flip[3]);
 
-		CvtToHalf(out_normals[i + 0], wq[0].nq * in[i + 0].normal);
-		CvtToHalf(out_normals[i + 1], wq[0].nq * in[i + 1].normal);
-		CvtToHalf(out_normals[i + 2], wq[0].nq * in[i + 2].normal);
-		CvtToHalf(out_normals[i + 3], wq[0].nq * in[i + 3].normal);
+		out_packed_normals[i + 0] = SPipNormal(out_normals[0]);
+		out_packed_normals[i + 1] = SPipNormal(out_normals[1]);
+		out_packed_normals[i + 2] = SPipNormal(out_normals[2]);
+		out_packed_normals[i + 3] = SPipNormal(out_normals[3]);
 	}
 	for (size_t i = (count & ~3); i < count; ++i)
 	#else // MMRM_UNROLL_GEOMETRY_BAKING_LOOPS
@@ -2587,6 +2625,7 @@ static inline void UpdateGeneralTangentsNormals(
 		//_mm_prefetch((const char*)&in[i+4], _MM_HINT_T0);
 		_wq[0] = _wq[1] = _mm_xor_ps(_wq[0], _wq[0]);
 		in_tangents[0] = in[i + 0].qt.GetQ();
+		in_normals[0] = in[i + 0].normal.GetN();
 		vweights[0] = _mm_load_ps(&in[i + 0].weights[0]);
 		switch (maxSpines)
 		{
@@ -2614,18 +2653,19 @@ static inline void UpdateGeneralTangentsNormals(
 		out_general[i + 0].color = in[i + 0].colour;
 		CvtToHalf(out_general[i + 0].st, in[i + 0].uv);
 		out_tangents[0] = (wq[0].nq * in_tangents[0]);
-
+		out_normals[0] = (wq[0].nq * in_normals[0]);
 		if (out_tangents[0].w < 0.f) out_tangents[0] = -out_tangents[0];
 		flip[0] = in_tangents[0].w < 0.f ? -1 : 1;
 		if (flip[0] < 0) out_tangents[0] = -out_tangents[0];
 		out_packed_tangents[i + 0] = SPipTangents(out_tangents[0], flip[0]);
-
-		CvtToHalf(out_normals[i + 0], wq[0].nq * in[i + 0].normal);
+		out_packed_normals[i + 0] = SPipNormal(out_normals[0]);
 	}
 #else
 	float l[4];
 	Quat out_tangents[4];
 	Quat in_tangents[4];
+	Vec3 out_normals[4];
+	Vec3 in_normals[4];
 	DualQuatA wq[4];
 	int16 flip[4];
 	for (size_t i = 0; i < (count & ~3); i += 4)
@@ -2635,6 +2675,11 @@ static inline void UpdateGeneralTangentsNormals(
 		in_tangents[1] = in[i + 1].qt.GetQ();
 		in_tangents[2] = in[i + 2].qt.GetQ();
 		in_tangents[3] = in[i + 3].qt.GetQ();
+
+		in_normals[0] = in[i + 0].normal.GetN();
+		in_normals[1] = in[i + 1].normal.GetN();
+		in_normals[2] = in[i + 2].normal.GetN();
+		in_normals[3] = in[i + 3].normal.GetN();
 		switch (maxSpines)
 		{
 		case 4:
@@ -2700,6 +2745,11 @@ static inline void UpdateGeneralTangentsNormals(
 		out_tangents[2] = (wq[2].nq * in_tangents[2]);
 		out_tangents[3] = (wq[3].nq * in_tangents[3]);
 
+		out_normals[0] = (wq[0].nq * in_normals[0]);
+		out_normals[1] = (wq[1].nq * in_normals[1]);
+		out_normals[2] = (wq[2].nq * in_normals[2]);
+		out_normals[3] = (wq[3].nq * in_normals[3]);
+
 		if (out_tangents[0].w < 0.f) out_tangents[0] = -out_tangents[0];
 		if (out_tangents[1].w < 0.f) out_tangents[1] = -out_tangents[1];
 		if (out_tangents[2].w < 0.f) out_tangents[2] = -out_tangents[2];
@@ -2720,15 +2770,16 @@ static inline void UpdateGeneralTangentsNormals(
 		out_packed_tangents[i + 2] = SPipTangents(out_tangents[2], flip[2]);
 		out_packed_tangents[i + 3] = SPipTangents(out_tangents[3], flip[3]);
 
-		out_normals[i + 0] = wq[0].nq * in[i + 0].normal;
-		out_normals[i + 0] = wq[0].nq * in[i + 0].normal;
-		out_normals[i + 0] = wq[0].nq * in[i + 0].normal;
-		out_normals[i + 0] = wq[0].nq * in[i + 0].normal;
+		out_packed_normals[i + 0] = SPipNormal(out_normals[0]);
+		out_packed_normals[i + 1] = SPipNormal(out_normals[1]);
+		out_packed_normals[i + 2] = SPipNormal(out_normals[2]);
+		out_packed_normals[i + 3] = SPipNormal(out_normals[3]);
 	}
 	for (size_t i = (count & ~3); i < count; ++i)
 	{
 		wq[0] = DualQuatA(ZERO);
 		in_tangents[0] = in[i + 0].qt.GetQ();
+		in_normals[0] = in[i + 0].normal.GetN();
 		switch (maxSpines)
 		{
 		case 4:
@@ -2749,28 +2800,31 @@ static inline void UpdateGeneralTangentsNormals(
 		out_general[i + 0].color = in[i + 0].colour;
 		out_general[i + 0].st = in[i + 0].uv;
 		out_tangents[0] = (wq[0].nq * in_tangents[0]);
+		out_normals[0] = (wq[0].nq * in_normals[0]);
 		if (out_tangents[0].w < 0.f) out_tangents[0] = -out_tangents[0];
 		flip[0] = in_tangents[0].w < 0.f ? -1 : 1;
 		if (flip[0] < 0) out_tangents[0] = -out_tangents[0];
 		out_packed_tangents[i + 0] = SPipTangents(out_tangents[0], flip[0]);
-		out_normals[i + 0] = wq[0].nq * in[i + 0].normal;
+		out_packed_normals[i + 0] = SPipNormal(out_normals[0]);
 	}
 #endif
 }
 
 static inline void UpdateGeneralTangentsNormals(
-  SVF_P3S_C4B_T2S* out_general
+  SVF_P3H_C4B_T2H* out_general
   , SPipTangents* out_packed_tangents
-  , Vec3f16* out_normals
+  , SPipNormal* out_packed_normals
   , SVF_P3F_C4B_T2F* in_general
   , SPipQTangents* in_packed_tangents
-  , Vec3* in_normals
+  , SPipNormal* in_packed_normals
   , size_t count
   , const Matrix34& wmat)
 {
 	MMRM_PROFILE_FUNCTION(gEnv->pSystem, PROFILE_3DENGINE);
 	Quat out_tangents[4];
 	Quat in_tangents[4];
+	Vec3 out_normals[4];
+	Vec3 in_normals[4];
 	int16 flip[4];
 	Quat q = mat33_to_quat(Matrix33(wmat));
 	q.Normalize();
@@ -2795,10 +2849,20 @@ static inline void UpdateGeneralTangentsNormals(
 		in_tangents[2] = in_packed_tangents[i + 2].GetQ();
 		in_tangents[3] = in_packed_tangents[i + 3].GetQ();
 
+		in_normals[0] = in_packed_normals[i + 0].GetN();
+		in_normals[1] = in_packed_normals[i + 1].GetN();
+		in_normals[2] = in_packed_normals[i + 2].GetN();
+		in_normals[3] = in_packed_normals[i + 3].GetN();
+
 		out_tangents[0] = q * in_tangents[0];
 		out_tangents[1] = q * in_tangents[1];
 		out_tangents[2] = q * in_tangents[2];
 		out_tangents[3] = q * in_tangents[3];
+
+		out_normals[0] = q * in_normals[0];
+		out_normals[1] = q * in_normals[1];
+		out_normals[2] = q * in_normals[2];
+		out_normals[3] = q * in_normals[3];
 
 		flip[0] = in_tangents[0].w < 0.f ? -1 : 1;
 		flip[1] = in_tangents[1].w < 0.f ? -1 : 1;
@@ -2815,10 +2879,10 @@ static inline void UpdateGeneralTangentsNormals(
 		out_packed_tangents[i + 2] = SPipTangents(out_tangents[2], flip[2]);
 		out_packed_tangents[i + 3] = SPipTangents(out_tangents[3], flip[3]);
 
-		out_normals[i + 0] = in_normals[i + 0];
-		out_normals[i + 1] = in_normals[i + 1];
-		out_normals[i + 2] = in_normals[i + 2];
-		out_normals[i + 3] = in_normals[i + 3];
+		out_packed_normals[i + 0] = SPipNormal(out_normals[0]);
+		out_packed_normals[i + 1] = SPipNormal(out_normals[1]);
+		out_packed_normals[i + 2] = SPipNormal(out_normals[2]);
+		out_packed_normals[i + 3] = SPipNormal(out_normals[3]);
 	}
 	for (size_t i = (count & ~3); i < count; ++i)
 	{
@@ -2827,17 +2891,18 @@ static inline void UpdateGeneralTangentsNormals(
 		out_general[i].st = in_general[i].st;
 
 		in_tangents[0] = in_packed_tangents[i + 0].GetQ();
+		in_normals[0] = in_packed_normals[i + 0].GetN();
 		out_tangents[0] = q * in_tangents[0];
+		out_normals[0] = q * in_normals[0];
 		flip[0] = in_tangents[0].w < 0.f ? -1 : 1;
 		if (flip[0] < 0) out_tangents[0] = -out_tangents[0];
 		out_packed_tangents[i + 0] = SPipTangents(out_tangents[0], flip[0]);
-
-		out_normals[i + 0] = in_normals[i + 0];
+		out_packed_normals[i + 0] = SPipNormal(out_normals[0]);
 	}
 }
 
 static inline void UpdateGeneralTangents(
-  SVF_P3S_C4B_T2S* out_general
+  SVF_P3H_C4B_T2H* out_general
   , SPipTangents* out_packed_tangents
   , SVF_P3F_C4B_T2F* in_general
   , SPipQTangents* in_packed_tangents
@@ -2905,9 +2970,95 @@ static inline void UpdateGeneralTangents(
 }
 
 static inline void UpdateGeneralTangentsNormals(
-  SVF_P3S_C4B_T2S* out_general
+  SVF_P3H_C4B_T2H* out_general
   , SPipTangents* out_packed_tangents
-  , Vec3f16* out_normals
+  , SPipNormal* out_packed_normals
+  , SMMRMSkinVertex* in_general
+  , size_t count
+  , const Matrix34& wmat)
+{
+	MMRM_PROFILE_FUNCTION(gEnv->pSystem, PROFILE_3DENGINE);
+	Quat out_tangents[4];
+	Quat in_tangents[4];
+	Vec3 out_normals[4];
+	Vec3 in_normals[4];
+	int16 flip[4];
+	Quat q = mat33_to_quat(Matrix33(wmat));
+	q.Normalize();
+	for (size_t i = 0; i < (count & ~3); i += 4)
+	{
+		out_general[i + 0].xyz = wmat * in_general[i + 0].pos;
+		out_general[i + 0].color = in_general[i + 0].colour;
+		out_general[i + 0].st = in_general[i + 0].uv;
+		out_general[i + 1].xyz = wmat * in_general[i + 1].pos;
+		out_general[i + 1].color = in_general[i + 1].colour;
+		out_general[i + 1].st = in_general[i + 1].uv;
+		out_general[i + 2].xyz = wmat * in_general[i + 2].pos;
+		out_general[i + 2].color = in_general[i + 2].colour;
+		out_general[i + 2].st = in_general[i + 2].uv;
+		out_general[i + 3].xyz = wmat * in_general[i + 3].pos;
+		out_general[i + 3].color = in_general[i + 3].colour;
+		out_general[i + 3].st = in_general[i + 3].uv;
+
+		in_tangents[0] = in_general[i + 0].qt.GetQ();
+		in_tangents[1] = in_general[i + 1].qt.GetQ();
+		in_tangents[2] = in_general[i + 2].qt.GetQ();
+		in_tangents[3] = in_general[i + 3].qt.GetQ();
+
+		in_normals[0] = in_general[i + 0].normal.GetN();
+		in_normals[1] = in_general[i + 1].normal.GetN();
+		in_normals[2] = in_general[i + 2].normal.GetN();
+		in_normals[3] = in_general[i + 3].normal.GetN();
+
+		out_tangents[0] = q * in_tangents[0];
+		out_tangents[1] = q * in_tangents[1];
+		out_tangents[2] = q * in_tangents[2];
+		out_tangents[3] = q * in_tangents[3];
+
+		out_normals[0] = q * in_normals[0];
+		out_normals[1] = q * in_normals[1];
+		out_normals[2] = q * in_normals[2];
+		out_normals[3] = q * in_normals[3];
+
+		flip[0] = in_tangents[0].w < 0.f ? -1 : 1;
+		flip[1] = in_tangents[1].w < 0.f ? -1 : 1;
+		flip[2] = in_tangents[2].w < 0.f ? -1 : 1;
+		flip[3] = in_tangents[3].w < 0.f ? -1 : 1;
+
+		if (flip[0] < 0) out_tangents[0] = -out_tangents[0];
+		if (flip[1] < 0) out_tangents[1] = -out_tangents[1];
+		if (flip[2] < 0) out_tangents[2] = -out_tangents[2];
+		if (flip[3] < 0) out_tangents[3] = -out_tangents[3];
+
+		out_packed_tangents[i + 0] = SPipTangents(out_tangents[0], flip[0]);
+		out_packed_tangents[i + 1] = SPipTangents(out_tangents[1], flip[1]);
+		out_packed_tangents[i + 2] = SPipTangents(out_tangents[2], flip[2]);
+		out_packed_tangents[i + 3] = SPipTangents(out_tangents[3], flip[3]);
+
+		out_packed_normals[i + 0] = SPipNormal(out_normals[0]);
+		out_packed_normals[i + 1] = SPipNormal(out_normals[1]);
+		out_packed_normals[i + 2] = SPipNormal(out_normals[2]);
+		out_packed_normals[i + 3] = SPipNormal(out_normals[3]);
+	}
+	for (size_t i = (count & ~3); i < count; ++i)
+	{
+		out_general[i].xyz = wmat * in_general[i].pos;
+		out_general[i].color = in_general[i].colour;
+		out_general[i].st = in_general[i].uv;
+		in_tangents[0] = in_general[i + 0].qt.GetQ();
+		in_normals[0] = in_general[i + 0].normal.GetN();
+		out_tangents[0] = q * in_tangents[0];
+		out_normals[0] = q * in_normals[0];
+		flip[0] = in_tangents[0].w < 0.f ? -1 : 1;
+		if (flip[0] < 0) out_tangents[0] = -out_tangents[0];
+		out_packed_tangents[i + 0] = SPipTangents(out_tangents[0], flip[0]);
+		out_packed_normals[i + 0] = SPipNormal(out_normals[0]);
+	}
+}
+
+static inline void UpdateGeneralTangents(
+  SVF_P3H_C4B_T2H* out_general
+  , SPipTangents* out_packed_tangents
   , SMMRMSkinVertex* in_general
   , size_t count
   , const Matrix34& wmat)
@@ -2957,78 +3108,6 @@ static inline void UpdateGeneralTangentsNormals(
 		out_packed_tangents[i + 1] = SPipTangents(out_tangents[1], flip[1]);
 		out_packed_tangents[i + 2] = SPipTangents(out_tangents[2], flip[2]);
 		out_packed_tangents[i + 3] = SPipTangents(out_tangents[3], flip[3]);
-
-		out_normals[i + 0] = in_general[i + 0].normal;
-		out_normals[i + 1] = in_general[i + 1].normal;
-		out_normals[i + 2] = in_general[i + 2].normal;
-		out_normals[i + 3] = in_general[i + 3].normal;
-	}
-	for (size_t i = (count & ~3); i < count; ++i)
-	{
-		out_general[i].xyz = wmat * in_general[i].pos;
-		out_general[i].color = in_general[i].colour;
-		out_general[i].st = in_general[i].uv;
-		in_tangents[0] = in_general[i + 0].qt.GetQ();
-		out_tangents[0] = q * in_tangents[0];
-		flip[0] = in_tangents[0].w < 0.f ? -1 : 1;
-		if (flip[0] < 0) out_tangents[0] = -out_tangents[0];
-		out_packed_tangents[i + 0] = SPipTangents(out_tangents[0], flip[0]);
-		out_normals[i + 0] = in_general[i + 0].normal;
-	}
-}
-
-static inline void UpdateGeneralTangents(
-  SVF_P3S_C4B_T2S* out_general
-  , SPipTangents* out_packed_tangents
-  , SMMRMSkinVertex* in_general
-  , size_t count
-  , const Matrix34& wmat)
-{
-	MMRM_PROFILE_FUNCTION(gEnv->pSystem, PROFILE_3DENGINE);
-	Quat out_tangents[4];
-	Quat in_tangents[4];
-	int16 flip[4];
-	Quat q = mat33_to_quat(Matrix33(wmat));
-	q.Normalize();
-	for (size_t i = 0; i < (count & ~3); i += 4)
-	{
-		out_general[i + 0].xyz = wmat * in_general[i + 0].pos;
-		out_general[i + 0].color = in_general[i + 0].colour;
-		out_general[i + 0].st = in_general[i + 0].uv;
-		out_general[i + 1].xyz = wmat * in_general[i + 1].pos;
-		out_general[i + 1].color = in_general[i + 1].colour;
-		out_general[i + 1].st = in_general[i + 1].uv;
-		out_general[i + 2].xyz = wmat * in_general[i + 2].pos;
-		out_general[i + 2].color = in_general[i + 2].colour;
-		out_general[i + 2].st = in_general[i + 2].uv;
-		out_general[i + 3].xyz = wmat * in_general[i + 3].pos;
-		out_general[i + 3].color = in_general[i + 3].colour;
-		out_general[i + 3].st = in_general[i + 3].uv;
-
-		in_tangents[0] = in_general[i + 0].qt.GetQ();
-		in_tangents[1] = in_general[i + 1].qt.GetQ();
-		in_tangents[2] = in_general[i + 2].qt.GetQ();
-		in_tangents[3] = in_general[i + 3].qt.GetQ();
-
-		out_tangents[0] = q * in_tangents[0];
-		out_tangents[1] = q * in_tangents[1];
-		out_tangents[2] = q * in_tangents[2];
-		out_tangents[3] = q * in_tangents[3];
-
-		flip[0] = in_tangents[0].w < 0.f ? -1 : 1;
-		flip[1] = in_tangents[1].w < 0.f ? -1 : 1;
-		flip[2] = in_tangents[2].w < 0.f ? -1 : 1;
-		flip[3] = in_tangents[3].w < 0.f ? -1 : 1;
-
-		if (flip[0] < 0) out_tangents[0] = -out_tangents[0];
-		if (flip[1] < 0) out_tangents[1] = -out_tangents[1];
-		if (flip[2] < 0) out_tangents[2] = -out_tangents[2];
-		if (flip[3] < 0) out_tangents[3] = -out_tangents[3];
-
-		out_packed_tangents[i + 0] = SPipTangents(out_tangents[0], flip[0]);
-		out_packed_tangents[i + 1] = SPipTangents(out_tangents[1], flip[1]);
-		out_packed_tangents[i + 2] = SPipTangents(out_tangents[2], flip[2]);
-		out_packed_tangents[i + 3] = SPipTangents(out_tangents[3], flip[3]);
 	}
 	for (size_t i = (count & ~3); i < count; ++i)
 	{
@@ -3045,7 +3124,7 @@ static inline void UpdateGeneralTangents(
 }
 
 static inline void UpdateGeneralTangents(
-  SVF_P3S_C4B_T2S* out_general
+  SVF_P3H_C4B_T2H* out_general
   , SPipTangents* out_packed_tangents
   , SMMRMSkinVertex* in_general
   , SMMRMDeformVertex* deform
@@ -3238,9 +3317,9 @@ static void MergeInstanceList(SMMRMInstanceContext& context)
 	SMMRMSpineVtxBase* spines = context.use_spines ? context.spines : NULL;
 	SMMRMSpineVtx* geomSpines = (geom->pSpineVtx);
 	SMMRMSpineInfo* geomSpineInfo = (geom->pSpineInfo);
-	SVF_P3S_C4B_T2S* general = update->general;
+	SVF_P3H_C4B_T2H* general = update->general;
 	SPipTangents* tangents = update->tangents;
-	Vec3f16* normals = update->normals;
+	SPipNormal* normals = update->normals;
 	vtx_idx* idxBuf = update->idxBuf;
 	PREFAST_SUPPRESS_WARNING(6255)
 	DualQuatA * bones = spines && geom->numSpineVtx ? CryStackAllocVector(DualQuatA, (geom->numSpineVtx + 1), CRY_PLATFORM_ALIGNMENT) : NULL;
@@ -3946,7 +4025,7 @@ static inline void MergeInstanceListDeform(SMMRMInstanceContext& context)
 	SMMRMUpdateContext* update = context.update;
 	SMMRMDeformVertex* deform_vertices = context.deform;
 	SMMRMDeform* deform = (geom->deform);
-	SVF_P3S_C4B_T2S* general = update->general;
+	SVF_P3H_C4B_T2H* general = update->general;
 	SPipTangents* tangents = update->tangents;
 	vtx_idx* idxBuf = update->idxBuf;
 	mmrm_printf("updating %d samples\n", context.amount);

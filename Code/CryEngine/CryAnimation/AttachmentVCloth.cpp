@@ -1176,8 +1176,8 @@ void CAttachmentVCLOTH::SoftwareSkinningDQ_VS_Emulator( CModelMesh* pModelMesh, 
 			arrSkinned[e]=1;
 			Vec3		hwPosition	= *(Vec3*)(pPositions + e * nPositionStride) + pModelMesh->m_vRenderMeshOffset;
 			SPipQTangents	hwQTangent	= *(SPipQTangents*)(pQTangents + e * nQTangentStride);
-			uint16*	hwIndices   = ((SVF_W4B_I4S*)(pSkinningInfo + e*nSkinningStride))->indices;
-			ColorB	hwWeights		= *(ColorB*)&((SVF_W4B_I4S*)(pSkinningInfo + e*nSkinningStride))->weights;
+			uint16*	hwIndices   = ((SVF_W4B_I4U*)(pSkinningInfo + e*nSkinningStride))->indices;
+			ColorB	hwWeights		= *(ColorB*)&((SVF_W4B_I4U*)(pSkinningInfo + e*nSkinningStride))->weights;
 
 			//---------------------------------------------------------------------
 			//---     this is CPU emulation of Dual-Quat skinning              ---
@@ -3381,7 +3381,7 @@ void CClothPiece::SkinSimulationToRenderMesh(int lod, CVertexData& vertexData, c
 #ifdef CLOTH_SSE
 	Vector4 minusOne(0.f, 0.f, 0.f, -1.f);
 	Vector4 maxShort(32767.f);
-	CRY_ALIGN(16) Vec4sf tangentBitangent[2];
+	CRY_ALIGN(16) Vec4i16 tangentBitangent[2];
 #endif
 	for (int i = 0; i < nVtx; i++) 
 	{

@@ -81,14 +81,14 @@ enum ECgfStreamType
 	CGF_STREAM_NORMALS,
 	CGF_STREAM_TEXCOORDS,
 	CGF_STREAM_COLORS,
-	CGF_STREAM_COLORS2,
+	CGF_STREAM_DUMMY3_,  //!< Used to be CGF_STREAM_COLORS2, dummy is needed to keep existing assets loadable.
 	CGF_STREAM_INDICES,
 	CGF_STREAM_TANGENTS,
 	CGF_STREAM_DUMMY0_,  //!< Used to be CGF_STREAM_SHCOEFFS, dummy is needed to keep existing assets loadable.
 	CGF_STREAM_DUMMY1_,  //!< Used to be CGF_STREAM_SHAPEDEFORMATION, dummy is needed to keep existing assets loadable.
 	CGF_STREAM_BONEMAPPING,
 	CGF_STREAM_FACEMAP,
-	CGF_STREAM_VERT_MATS,
+	CGF_STREAM_SUBSETIDS,
 	CGF_STREAM_QTANGENTS,
 	CGF_STREAM_SKINDATA,
 	CGF_STREAM_DUMMY2_,  //!< Used to be CGF_STREAM_PS3EDGEDATA, dummy is needed to keep existing assets loadable.

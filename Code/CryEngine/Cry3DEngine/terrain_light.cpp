@@ -27,7 +27,7 @@ _smart_ptr<IRenderMesh> CTerrain::MakeAreaRenderMesh(const Vec3& vPos, float fRa
 	lstIndices.Clear();
 	PodArray<Vec3> posBuffer;
 	posBuffer.Clear();
-	PodArray<SVF_P3S_C4B_T2S> vertBuffer;
+	PodArray<SVF_P3H_C4B_T2H> vertBuffer;
 	vertBuffer.Clear();
 	PodArray<SPipTangents> tangBasises;
 	tangBasises.Clear();
@@ -125,7 +125,7 @@ _smart_ptr<IRenderMesh> CTerrain::MakeAreaRenderMesh(const Vec3& vPos, float fRa
 
 	for (int i = 0, nPosCount = posBuffer.size(); i < nPosCount; i++)
 	{
-		SVF_P3S_C4B_T2S vTmp;
+		SVF_P3H_C4B_T2H vTmp;
 		vTmp.xyz = posBuffer[i] - vPos;
 		vTmp.color.dcolor = uint32(-1);
 		vTmp.st = Vec2(0, 0);
@@ -146,7 +146,7 @@ _smart_ptr<IRenderMesh> CTerrain::MakeAreaRenderMesh(const Vec3& vPos, float fRa
 	}
 
 	_smart_ptr<IRenderMesh> pMesh = GetRenderer()->CreateRenderMeshInitialized(
-	  vertBuffer.GetElements(), vertBuffer.Count(), EDefaultInputLayouts::P3S_C4B_T2S,
+	  vertBuffer.GetElements(), vertBuffer.Count(), EDefaultInputLayouts::P3H_C4B_T2H,
 	  lstIndices.GetElements(), lstIndices.Count(), prtTriangleList,
 	  szLSourceName, szLSourceName, eRMT_Static, 1, 0, NULL, NULL, false, true, tangBasises.GetElements());
 

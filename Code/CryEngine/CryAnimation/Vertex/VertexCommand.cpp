@@ -127,7 +127,7 @@ void VertexCommandTangents::Execute(VertexCommandTangents& command, CVertexData&
 	}
 
 	const __m128 _32767 = _mm_set1_ps(32767.0f);
-	CRY_ALIGN(16) Vec4sf tangentBitangent[2];
+	CRY_ALIGN(16) Vec4i16 tangentBitangent[2];
 
 	for (uint i = 0; i < command.tangetUpdateVertIdsCount; ++i)
 	{
@@ -563,7 +563,7 @@ void VertexCommandSkin::ExecuteInternal(VertexCommandSkin& command, CVertexData&
 	__m128 _weights03;
 	__m128 _weights47;
 	__m128 _weight;
-	CRY_ALIGN(16) Vec4sf tangentBitangent[2];
+	CRY_ALIGN(16) Vec4i16 tangentBitangent[2];
 	CRY_ALIGN(16) Vec3A newPos;
 
 	strided_pointer<const Vec3> pPositionsPrevious = command.pVertexPositionsPrevious;

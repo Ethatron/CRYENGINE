@@ -84,7 +84,6 @@ void CollectCgfDetails(XmlNodeRef& xmlnode, const CContentCGF& cgf)
 {
 	size_t triangleCount = 0;
 	size_t vertexCount = 0;
-	bool b16BitPrecision = false;
 
 	for (int i = 0, n = cgf.GetNodeCount(); i < n; ++i)
 	{
@@ -99,10 +98,10 @@ void CollectCgfDetails(XmlNodeRef& xmlnode, const CContentCGF& cgf)
 		{
 			triangleCount += std::max(pMesh->GetFaceCount(), pMesh->GetIndexCount() / 3); // Compiled meshes do not have faces.
 			vertexCount += pMesh->GetVertexCount();
-			b16BitPrecision = b16BitPrecision || (pMesh->m_pPositionsF16 != nullptr);
 		}
 	}
 
+	const bool b16BitPrecision = !cgf.GetExportInfo()->bWantF32Vertices;
 	const int materialCount = cgf.GetMaterialCount();
 
 	std::vector<std::pair<string, string>> details;

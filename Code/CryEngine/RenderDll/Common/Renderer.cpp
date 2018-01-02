@@ -2622,7 +2622,7 @@ _smart_ptr<IRenderMesh> CRenderer::CreateRenderMeshInitialized(
 	int nMatInfoCount, int nClientTextureBindID,
 	bool (* PrepareBufferCallback)(IRenderMesh*, bool),
 	void* CustomData, bool bOnlyVideoBuffer, bool bPrecache,
-	const SPipTangents* pTangents, bool bLockForThreadAcc, Vec3* pNormals)
+	const SPipTangents* pTangents, bool bLockForThreadAcc, SPipNormal* pNormals)
 {
 	FUNCTION_PROFILER_RENDERER;
 

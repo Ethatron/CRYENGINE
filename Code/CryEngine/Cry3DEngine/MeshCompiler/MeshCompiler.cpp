@@ -63,11 +63,10 @@ struct VertexLess
 			return res < 0;
 		}
 
-		if ((mesh.m_pNorms && (res = memcmp(&mesh.m_pNorms[a], &mesh.m_pNorms[b], sizeof(mesh.m_pNorms[a])))) ||
+		if ((mesh.m_pNormals && (res = memcmp(&mesh.m_pNormals[a], &mesh.m_pNormals[b], sizeof(mesh.m_pNormals[a])))) ||
 		    (mesh.m_pTexCoord && (res = memcmp(&mesh.m_pTexCoord[a], &mesh.m_pTexCoord[b], sizeof(mesh.m_pTexCoord[a])))) ||
-		    (mesh.m_pColor0 && (res = memcmp(&mesh.m_pColor0[a], &mesh.m_pColor0[b], sizeof(mesh.m_pColor0[a])))) ||
-		    (mesh.m_pColor1 && (res = memcmp(&mesh.m_pColor1[a], &mesh.m_pColor1[b], sizeof(mesh.m_pColor1[a])))) ||
-		    (mesh.m_pVertMats && (res = memcmp(&mesh.m_pVertMats[a], &mesh.m_pVertMats[b], sizeof(mesh.m_pVertMats[a])))) ||
+		    (mesh.m_pColors && (res = memcmp(&mesh.m_pColors[a], &mesh.m_pColors[b], sizeof(mesh.m_pColors[a])))) ||
+		    (mesh.m_pSubsetIds && (res = memcmp(&mesh.m_pSubsetIds[a], &mesh.m_pSubsetIds[b], sizeof(mesh.m_pSubsetIds[a])))) ||
 		    (mesh.m_pTangents && (res = memcmp(&mesh.m_pTangents[a], &mesh.m_pTangents[b], sizeof(mesh.m_pTangents[a])))))
 		{
 			return res < 0;
@@ -85,18 +84,16 @@ inline void CopyMeshVertex(CMesh& newMesh, int newVertex, const CMesh& oldMesh, 
 	assert(oldMesh.m_pPositionsF16 == 0);
 
 	newMesh.m_pPositions[newVertex] = oldMesh.m_pPositions[oldVertex];
-	if (oldMesh.m_pNorms)
-		newMesh.m_pNorms[newVertex] = oldMesh.m_pNorms[oldVertex];
+	if (oldMesh.m_pNormals)
+		newMesh.m_pNormals[newVertex] = oldMesh.m_pNormals[oldVertex];
 	if (oldMesh.m_pTopologyIds)
 		newMesh.m_pTopologyIds[newVertex] = oldMesh.m_pTopologyIds[oldVertex];
 	if (oldMesh.m_pTexCoord)
 		newMesh.m_pTexCoord[newVertex] = oldMesh.m_pTexCoord[oldVertex];
-	if (oldMesh.m_pColor0)
-		newMesh.m_pColor0[newVertex] = oldMesh.m_pColor0[oldVertex];
-	if (oldMesh.m_pColor1)
-		newMesh.m_pColor1[newVertex] = oldMesh.m_pColor1[oldVertex];
-	if (oldMesh.m_pVertMats)
-		newMesh.m_pVertMats[newVertex] = oldMesh.m_pVertMats[oldVertex];
+	if (oldMesh.m_pColors)
+		newMesh.m_pColors[newVertex] = oldMesh.m_pColors[oldVertex];
+	if (oldMesh.m_pSubsetIds)
+		newMesh.m_pSubsetIds[newVertex] = oldMesh.m_pSubsetIds[oldVertex];
 	if (oldMesh.m_pTangents)
 		newMesh.m_pTangents[newVertex] = oldMesh.m_pTangents[oldVertex];
 }
@@ -189,7 +186,7 @@ class CMeshInputProxy
 		{
 			return "the mesh has no stream with positions";
 		}
-		if (!m_mesh.m_pNorms)
+		if (!m_mesh.m_pNormals)
 		{
 			return "the mesh has no stream with normals";
 		}
@@ -238,8 +235,8 @@ class CMeshInputProxy
 
 			v = m_mesh.m_pPositions[0];  // cppcheck-suppress redundantAssignment
 			v = m_mesh.m_pPositions[vertexCount - 1];
-			n = m_mesh.m_pNorms[0];  // cppcheck-suppress redundantAssignment
-			n = m_mesh.m_pNorms[vertexCount - 1];
+			n = m_mesh.m_pNormals[0];  // cppcheck-suppress redundantAssignment
+			n = m_mesh.m_pNormals[vertexCount - 1];
 			uv = m_mesh.m_pTexCoord[0]; // cppcheck-suppress redundantAssignment
 			uv = m_mesh.m_pTexCoord[vertexCount - 1];
 		}
@@ -333,7 +330,7 @@ public:
 
 		std::vector<Index> tmp;
 		prepareUniqueIndices(m_posIndx, tmp, PositionComparator(m_mesh.m_pPositions, m_mesh.m_pTopologyIds));
-		prepareUniqueIndices(m_normIndx, tmp, NormalComparator(m_mesh.m_pNorms));
+		prepareUniqueIndices(m_normIndx, tmp, NormalComparator(m_mesh.m_pNormals));
 		prepareUniqueIndices(m_texCoordIndx, tmp, TexCoordComparator(m_mesh.m_pTexCoord));
 	}
 
@@ -396,7 +393,7 @@ public:
 		assert((int)indwVertNo < 3);
 		const int vIdx = m_mesh.m_pFaces[indwTriNo].v[indwVertNo];
 		assert(vIdx < m_mesh.GetVertexCount());
-		outfNorm = m_mesh.m_pNorms[vIdx].GetN();
+		outfNorm = m_mesh.m_pNormals[vIdx].GetN();
 	}
 	//-----------------------------------------------------------------------------
 
@@ -508,7 +505,7 @@ static void debugDumpMesh(CMesh& mesh, const char* filename)
 	fprintf(f, "[Nor]\n");
 	for (int i = 0; i < mesh.GetVertexCount(); ++i)
 	{
-		const Vec3 n = mesh.m_pNorms[i].GetN();
+		const Vec3 n = mesh.m_pNormals[i].GetN();
 		fprintf(f, "\t%g %g %g\n", n.x, n.y, n.z);
 	}
 
@@ -556,11 +553,11 @@ bool CMeshCompiler::Compile(CMesh& mesh, int flags)
 		}
 
 		// the mesh is already compiled, likely to have a refresh here: just verify and correct tangent space
-		if (mesh.m_pTangents && mesh.m_pNorms)
+		if (mesh.m_pTangents && mesh.m_pNormals)
 		{
 			for (int i = 0; i < cVertexCount; ++i)
 			{
-				VerifyTangentSpace(mesh.m_pTangents[i], mesh.m_pNorms[i]);
+				VerifyTangentSpace(mesh.m_pTangents[i], mesh.m_pNormals[i]);
 			}
 		}
 
@@ -722,17 +719,15 @@ bool CMeshCompiler::Compile(CMesh& mesh, int flags)
 	CMesh outMesh;
 	outMesh.CopyFrom(mesh);
 	outMesh.SetVertexCount(max_vert_num);
-	outMesh.ReallocStream(CMesh::VERT_MATS, max_vert_num);
+	outMesh.ReallocStream(CMesh::SUBSET_IDS, max_vert_num);
 	if (mesh.m_pTopologyIds)
 		outMesh.ReallocStream(CMesh::TOPOLOGY_IDS, max_vert_num);
 	if (mesh.m_pTexCoord)
 		outMesh.ReallocStream(CMesh::TEXCOORDS, max_vert_num);
 	if (flags & MESH_COMPILE_TANGENTS)
 		outMesh.ReallocStream(CMesh::TANGENTS, max_vert_num);
-	if (mesh.m_pColor0)
-		outMesh.ReallocStream(CMesh::COLORS_0, max_vert_num);
-	if (mesh.m_pColor1)
-		outMesh.ReallocStream(CMesh::COLORS_1, max_vert_num);
+	if (mesh.m_pColors)
+		outMesh.ReallocStream(CMesh::COLORS, max_vert_num);
 
 	// temporarily store original subset index in subset's nNumVerts
 	{
@@ -814,7 +809,7 @@ bool CMeshCompiler::Compile(CMesh& mesh, int flags)
 					}
 
 					// store subset id to prevent vertex sharing between materials during re-compacting
-					outMesh.m_pVertMats[buff_vert_count] = pFace->nSubset;
+					outMesh.m_pSubsetIds[buff_vert_count] = pFace->nSubset;
 
 					++buff_vert_count;
 				}
@@ -1128,18 +1123,16 @@ bool CMeshCompiler::CreateIndicesAndDeleteDuplicateVertices(CMesh& mesh)
 	}
 
 	mesh.SetVertexCount(newVertexCount);
-	if (mesh.m_pNorms)
+	if (mesh.m_pNormals)
 		mesh.ReallocStream(CMesh::NORMALS, newVertexCount);
 	if (mesh.m_pTexCoord)
 		mesh.ReallocStream(CMesh::TEXCOORDS, newVertexCount);
-	if (mesh.m_pColor0)
-		mesh.ReallocStream(CMesh::COLORS_0, newVertexCount);
-	if (mesh.m_pColor1)
-		mesh.ReallocStream(CMesh::COLORS_1, newVertexCount);
+	if (mesh.m_pColors)
+		mesh.ReallocStream(CMesh::COLORS, newVertexCount);
 	if (mesh.m_pTangents)
 		mesh.ReallocStream(CMesh::TANGENTS, newVertexCount);
 	mesh.ReallocStream(CMesh::TOPOLOGY_IDS, 0);
-	mesh.ReallocStream(CMesh::VERT_MATS, 0);
+	mesh.ReallocStream(CMesh::SUBSET_IDS, 0);
 	mesh.SetFaceCount(0);
 	mesh.SetIndexCount(oldVertexCount);
 	for (int i = 0; i < oldVertexCount; ++i)

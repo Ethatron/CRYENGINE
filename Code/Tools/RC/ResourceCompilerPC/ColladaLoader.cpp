@@ -3485,7 +3485,7 @@ static CMesh* CreateCMeshFromMeshUtilsMesh(const MeshUtils::Mesh& mesh, const st
 
 	if (hasColor)
 	{
-		pMesh->ReallocStream(CMesh::COLORS_0, numVertices);
+		pMesh->ReallocStream(CMesh::COLORS, numVertices);
 	}
 
 	bool hasExtraWeights = false;
@@ -3516,7 +3516,7 @@ static CMesh* CreateCMeshFromMeshUtilsMesh(const MeshUtils::Mesh& mesh, const st
 		pMesh->m_pPositions[i] = mesh.m_positions[i];
 		pMesh->m_bbox.Add(mesh.m_positions[i]);
 
-		pMesh->m_pNorms[i] = SMeshNormal(mesh.m_normals[i]);
+		pMesh->m_pNormals[i] = SMeshNormal(mesh.m_normals[i]);
 
 		if (hasTexCoords)
 		{
@@ -3529,7 +3529,7 @@ static CMesh* CreateCMeshFromMeshUtilsMesh(const MeshUtils::Mesh& mesh, const st
 
 		if (hasColor)
 		{
-			pMesh->m_pColor0[i] = SMeshColor(
+			pMesh->m_pColors[i] = SMeshColor(
 				mesh.m_colors[i].r,
 				mesh.m_colors[i].g,
 				mesh.m_colors[i].b,
@@ -6229,7 +6229,7 @@ CContentCGF* ColladaScene::CreateContentCGF(
 					for (int j = 0; j < pMesh->GetVertexCount(); ++j)
 					{
 						pMesh->m_pPositions[j] = tm.TransformPoint(pMesh->m_pPositions[j]);
-						pMesh->m_pNorms[j].RotateSafelyBy(tmNormals);
+						pMesh->m_pNormals[j].RotateSafelyBy(tmNormals);
 
 						pMesh->m_bbox.Add(pMesh->m_pPositions[j]);
 					}

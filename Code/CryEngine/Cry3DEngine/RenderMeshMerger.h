@@ -126,21 +126,21 @@ public:
 
 protected:
 	PodArray<SRenderMeshInfoInput> m_lstRMIChunks;
-	PodArray<SVF_P3S_C4B_T2S>      m_lstVerts;
+	PodArray<SVF_P3H_C4B_T2H>      m_lstVerts;
 	PodArray<SPipTangents>         m_lstTangBasises;
 	PodArray<uint32>               m_lstIndices;
 
 	PodArray<SMergedChunk>         m_lstChunks;
 	PodArray<SMergedChunk>         m_lstChunksAll;
 
-	PodArray<SVF_P3S_C4B_T2S>      m_lstNewVerts;
+	PodArray<SVF_P3H_C4B_T2H>      m_lstNewVerts;
 	PodArray<SPipTangents>         m_lstNewTangBasises;
 	PodArray<vtx_idx>              m_lstNewIndices;
 	PodArray<SMergedChunk>         m_lstNewChunks;
 
 #if ENABLE_NORMALSTREAM_SUPPORT
-	PodArray<SPipNormal> m_lstNormals;
-	PodArray<SPipNormal> m_lstNewNormals;
+	PodArray<SPipNormal>           m_lstNormals;
+	PodArray<SPipNormal>           m_lstNewNormals;
 #endif
 
 	PodArray<SMergedChunk>      m_lstChunksMergedTemp;
@@ -162,7 +162,7 @@ private:
 
 	void       MakeRenderMeshInfoListOfAllChunks(SRenderMeshInfoInput* pRMIArray, int nRMICount, SMergeInfo& info);
 	void       MakeListOfAllCRenderChunks(SMergeInfo& info);
-	void       IsChunkValid(CRenderChunk& Ch, PodArray<SVF_P3S_C4B_T2S>& lstVerts, PodArray<uint32>& lstIndices);
+	void       IsChunkValid(CRenderChunk& Ch, PodArray<SVF_P3H_C4B_T2H>& lstVerts, PodArray<uint32>& lstIndices);
 
 	void       ClipByAABB(SMergeInfo& info);
 	void       ClipDecals(SMergeInfo& info);

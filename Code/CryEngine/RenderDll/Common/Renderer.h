@@ -1055,7 +1055,7 @@ public:
 	  int nMatInfoCount = 1, int nClientTextureBindID = 0,
 	  bool (* PrepareBufferCallback)(IRenderMesh*, bool) = NULL,
 	  void* CustomData = NULL,
-	  bool bOnlyVideoBuffer = false, bool bPrecache = true, const SPipTangents* pTangents = NULL, bool bLockForThreadAcc = false, Vec3* pNormals = NULL) override;
+	  bool bOnlyVideoBuffer = false, bool bPrecache = true, const SPipTangents* pTangents = NULL, bool bLockForThreadAcc = false, SPipNormal* pNormals = NULL) override;
 
 	virtual int GetMaxActiveTexturesARB() { return 0; }
 

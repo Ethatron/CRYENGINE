@@ -217,7 +217,7 @@ struct CRY_ALIGN(SMMRMSkinVertex_ALIGN) SMMRMSkinVertex
 {
 	float weights[4];
 	Vec3 pos;
-	Vec3 normal;
+	SPipNormal normal;
 	Vec2 uv;
 	UCol colour;
 	SPipQTangents qt;
@@ -263,7 +263,7 @@ struct CRY_ALIGN(16) SMMRMChunk
 	SVF_P3F_C4B_T2F* general;
 	SPipQTangents* qtangents;
 	SMMRMBoneMapping* weights;
-	Vec3* normals;
+	SPipNormal* normals;
 	vtx_idx* indices;
 	SMMRMSkinVertex* skin_vertices;
 
@@ -296,7 +296,7 @@ struct CRY_ALIGN(16) SMMRMChunk
 		size += sizeof(SVF_P3F_C4B_T2F) * nvertices_alloc;
 		size += sizeof(SPipTangents) * nvertices_alloc;
 		size += weights ? sizeof(SMMRMBoneMapping) * nvertices_alloc : 0;
-		size += normals ? sizeof(Vec3) * nvertices_alloc : 0;
+		size += normals ? sizeof(SPipNormal) * nvertices_alloc : 0;
 		size += sizeof(indices[0]) * nindices_alloc;
 		size += (skin_vertices) ? sizeof(SMMRMSkinVertex) * nvertices_alloc : 0;
 		return size;
@@ -627,9 +627,9 @@ struct SMMRMUpdateContext
 {
 	SMMRMGroupHeader*           group;
 	std::vector<SMergedRMChunk> chunks;
-	SVF_P3S_C4B_T2S*            general;
+	SVF_P3H_C4B_T2H*            general;
 	SPipTangents*               tangents;
-	Vec3f16*                    normals;
+	SPipNormal*                 normals;
 	vtx_idx*                    idxBuf;
 	volatile int*               updateFlag;
 	primitives::sphere*         colliders;
@@ -645,7 +645,7 @@ struct SMMRMUpdateContext
 	int                         use_spines;
 	int                         frame_count;
 #if MMRM_USE_BOUNDS_CHECK
-	SVF_P3S_C4B_T2S*            general_end;
+	SVF_P3H_C4B_T2H*            general_end;
 	SPipTangents*               tangents_end;
 	vtx_idx*                    idx_end;
 #endif

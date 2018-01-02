@@ -597,7 +597,7 @@ bool CStars::LoadData()
 			// read in stars
 			file.FRead(&m_numStars, 1);
 
-			SVF_P3S_C4B_T2S* pData(new SVF_P3S_C4B_T2S[6 * m_numStars]);
+			SVF_P3H_C4B_T2H* pData(new SVF_P3H_C4B_T2H[6 * m_numStars]);
 
 			for (unsigned int i(0); i < m_numStars; ++i)
 			{
@@ -631,7 +631,7 @@ bool CStars::LoadData()
 				}
 			}
 
-			m_pStarMesh = gRenDev->CreateRenderMeshInitialized(pData, 6 * m_numStars, EDefaultInputLayouts::P3S_C4B_T2S, 0, 0, prtTriangleList, "Stars", "Stars");
+			m_pStarMesh = gRenDev->CreateRenderMeshInitialized(pData, 6 * m_numStars, EDefaultInputLayouts::P3H_C4B_T2H, 0, 0, prtTriangleList, "Stars", "Stars");
 
 			delete[] pData;
 
@@ -698,7 +698,7 @@ void CStars::Render(bool bUseMoon)
 		rd->FX_SetState(nRenderState);
 
 		rd->FX_Commit();
-		if (!FAILED(rd->FX_SetVertexDeclaration(0, EDefaultInputLayouts::P3S_C4B_T2S)))
+		if (!FAILED(rd->FX_SetVertexDeclaration(0, EDefaultInputLayouts::P3H_C4B_T2H)))
 		{
 			buffer_size_t offset(0);
 			//void* pVB(m_pStarVB->GetStream(VSF_GENERAL, &offset));

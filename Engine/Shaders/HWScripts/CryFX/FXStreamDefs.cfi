@@ -18,7 +18,7 @@
 #endif
 
 
-#define IN_SKIN_STREAM float4 BlendWeights : BLENDWEIGHT; int4 BlendIndices : BLENDINDICES;
+#define IN_SKIN_STREAM float4 BlendWeights : BLENDWEIGHT; uint4 BlendIndices : BLENDINDICES;
 
 #define IN_VERTEX_VELOCITY_STREAM				\
 		float3 VertexVelocity : POSITION3;\

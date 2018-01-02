@@ -659,7 +659,7 @@ bool CharacterCompiler::ProcessInternal(CLoaderCGF* cgfLoader, CContentCGF* pCGF
 	{
 		if (pCContentCGF->GetNode(i)->pMesh == nullptr) continue;
 		CMesh& mesh = *pCContentCGF->GetNode(i)->pMesh;
-		if ((mesh.GetVertexCount()>0) && (mesh.m_pColor0 != nullptr))
+		if ((mesh.GetVertexCount()>0) && (mesh.m_pColors != nullptr))
 		{
 			bHasMeshWithColors = true;
 			break;
@@ -695,7 +695,7 @@ bool CharacterCompiler::ProcessInternal(CLoaderCGF* cgfLoader, CContentCGF* pCGF
 		attached.resize(nVtx);
 		for (int i = 0; i < nVtx; i++)
 		{
-			ColorB c = mesh->m_pColor0[i].GetRGBA();
+			ColorB c = mesh->m_pColors[i].GetRGBA();
 			attached[i] = AttachmentVClothPreProcess::IsAttached(1.f - (float)c.r / 255.f);
 		}
 

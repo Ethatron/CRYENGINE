@@ -38,7 +38,7 @@ bool CSoftwareMesh::Create(const CMesh& mesh, const DynArray<RChunk>& renderChun
 		return false;
 
 	// pre-calculate the UV vectors for recomputing tangents on 8 weight skinning meshes
-	if (mesh.m_pColor0)
+	if (mesh.m_pColors)
 	{
 		const uint triCount = mesh.GetIndexCount() / 3;
 		m_precTangentData.reserve(triCount);
@@ -50,7 +50,7 @@ bool CSoftwareMesh::Create(const CMesh& mesh, const DynArray<RChunk>& renderChun
 			const uint idx1 = mesh.m_pIndices[base];
 
 			// blue color used for updating tangents
-			const ColorB clr = mesh.m_pColor0[idx1].GetRGBA();
+			const ColorB clr = mesh.m_pColors[idx1].GetRGBA();
 			if (clr.b == 0xFF && clr.r == 0 && clr.g == 0)
 			{
 				const uint idx2 = mesh.m_pIndices[base + 1];
@@ -97,8 +97,8 @@ bool CSoftwareMesh::Create(const CMesh& mesh, const DynArray<RChunk>& renderChun
 	for (uint i = 0; i < vertexCount; ++i)
 	{
 		positions[i] = mesh.m_pPositions[i] + positionOffset;
-		if (mesh.m_pColor0)
-			colors[i] = *(uint32*)&mesh.m_pColor0[i];
+		if (mesh.m_pColors)
+			colors[i] = *(uint32*)&mesh.m_pColors[i];
 		else
 			colors[i] = 0xffffffff;
 		coords[i] = mesh.m_pTexCoord[i].GetUV();
@@ -214,7 +214,7 @@ bool CSoftwareMesh::Create(IRenderMesh& renderMesh, const DynArray<RChunk>& rend
 	AllocateVertices(vertexCount);
 
 	const bool texCoordsAre32Bits = renderMesh.GetVertexFormat() == EDefaultInputLayouts::P3F_C4B_T2F;
-	CRY_ASSERT(texCoordsAre32Bits || renderMesh.GetVertexFormat() == EDefaultInputLayouts::P3S_C4B_T2S);
+	CRY_ASSERT(texCoordsAre32Bits || renderMesh.GetVertexFormat() == EDefaultInputLayouts::P3H_C4B_T2H);
 
 	strided_pointer<Vec3> positions = GetWritePositions();
 	strided_pointer<uint32> colors = GetWriteColors();
@@ -248,7 +248,7 @@ bool CSoftwareMesh::Create(IRenderMesh& renderMesh, const DynArray<RChunk>& rend
 			pBlendWeights[j] = 0;
 		}
 
-		const ColorB& weights = *(const ColorB*)&((const SVF_W4B_I4S*)(pIndicesWeights + i * indicesWeightsStride))->weights;
+		const ColorB& weights = *(const ColorB*)&((const SVF_W4B_I4U*)(pIndicesWeights + i * indicesWeightsStride))->weights;
 		for (uint j = 0; j < 4; ++j)
 			pBlendWeights[j] = weights[j];
 	}
@@ -261,8 +261,8 @@ bool CSoftwareMesh::Create(IRenderMesh& renderMesh, const DynArray<RChunk>& rend
 		for (uint32 j = startIndex; j < endIndex; ++j)
 		{
 			const uint32 index = pIndices[j];
-			const uint16* subsetBlendIndices = ((const SVF_W4B_I4S*)(pIndicesWeights + index * indicesWeightsStride))->indices;
-			const ColorB& subsetWeightIndices = *(const ColorB*)&((const SVF_W4B_I4S*)(pIndicesWeights + index * indicesWeightsStride))->weights;
+			const uint16* subsetBlendIndices = ((const SVF_W4B_I4U*)(pIndicesWeights + index * indicesWeightsStride))->indices;
+			const ColorB& subsetWeightIndices = *(const ColorB*)&((const SVF_W4B_I4U*)(pIndicesWeights + index * indicesWeightsStride))->weights;
 
 			SoftwareVertexBlendIndex* pBlendIndices = &blendIndices[index];
 			for (uint k = 0; k < 4; ++k)

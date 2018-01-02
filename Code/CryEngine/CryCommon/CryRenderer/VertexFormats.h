@@ -56,38 +56,43 @@ struct EDefaultInputLayouts : InputLayoutHandle
 
 		// Base stream
 		P3F_C4B_T2F           =  1,
-		P3S_C4B_T2S           =  2,
-		P3S_N4B_C4B_T2S       =  3,
+		P3F_C4B_T2H           =  2,    //!< Road elements
+		P3H_C4B_T2H           =  3,
+		P3H_C4B_T2H_N4C       =  4,
 
-		P3F_C4B_T4B_N3F2      =  4,    //!< Particles.
-		TP3F_C4B_T2F          =  5,    //!< Full screen quad
-		P3F_T3F               =  6,    //!< Fog shadows
-		P3F_T2F_T3F           =  7,    //!< Mesh baker
+		P3F_C4B_T4B_N3F2      =  5,    //!< Particles.
+		P3F_T3F               =  6,    //!< AuxGeometryObj
+		P3F_T2F_T3F           =  7,    //!< WorldPos full-screen quad
 
 		P3F                   =  8,    //!< Raw Geometry
+		P3H                   =  9,    //!< Raw Geometry
 
-		P2S_N4B_C4B_T1F       =  9,    //!< Terrain sector
-		P3F_C4B_T2S           = 10,    //!< Road elements
+		P2H_C4B_T1F_N4C       = 10,    //!< Terrain sector
 
 		// Additional streams
+#ifdef NORM_FLOATS
 		T4F_B4F               = 11,    //!< Tangent/Bitangent
-		T4S_B4S               = 12,    //!< Tangent/Bitangent
-		Q4F                   = 13,    //!< QTangent
-		Q4S                   = 14,    //!< QTangent
-		N3F                   = 15,    //!< Normal
-		W4B_I4S               = 16,    //!< Skinned weights/indices stream
-		V3F                   = 17,    //!< Velocity stream
-		W2F                   = 18,    //!< Morph-buddy weights
+		Q4F                   = 12,    //!< QTangent
+		N3F                   = 13,    //!< Normal
+#else
+		T4S_B4S               = 11,    //!< Tangent/Bitangent
+		Q4S                   = 12,    //!< QTangent
+		N3S                   = 13,    //!< Normal
+#endif
 
-		V4Fi                  = 19,    //!< Instanced Vec4 stream
+		W4B_I4U               = 14,    //!< Skinned weights/indices stream
+		V3F                   = 15,    //!< Velocity stream
+		W2F                   = 16,    //!< Morph-buddy weights
 
-		PreAllocated          = 20,    // from this value and up custom input layouts are assigned
+		V4Fi                  = 17,    //!< Instanced Vec4 stream
+
+		PreAllocated          = 18,    // from this value and up custom input layouts are assigned
 		MaxRenderMesh         = PreAllocated
 	};
 };
 
 //////////////////////////////////////////////////////////////////////
-typedef Vec4_tpl<int16> Vec4sf;   //!< Used for tangents only.
+typedef Vec4_tpl<int16> Vec4i16;   //!< Used for tangents only.
 
 //! bNeedNormals=1 - float normals; bNeedNormals=2 - byte normals
 inline InputLayoutHandle VertFormatForComponents(bool bNeedCol, bool bHasTC, bool bHasPS, bool bHasNormal)
@@ -97,9 +102,9 @@ inline InputLayoutHandle VertFormatForComponents(bool bNeedCol, bool bHasTC, boo
 	if (bHasPS)
 		RequestedVertFormat = EDefaultInputLayouts::P3F_C4B_T4B_N3F2;
 	else if (bHasNormal)
-		RequestedVertFormat = EDefaultInputLayouts::P3S_N4B_C4B_T2S;
+		RequestedVertFormat = EDefaultInputLayouts::P3H_C4B_T2H_N4C;
 	else
-		RequestedVertFormat = EDefaultInputLayouts::P3S_C4B_T2S;
+		RequestedVertFormat = EDefaultInputLayouts::P3H_C4B_T2H;
 
 	return RequestedVertFormat;
 }
@@ -115,61 +120,41 @@ struct UCol
 		struct { uint8 z, y, x, w; };
 	};
 
-	//! Get normal vector from unsigned 8bit integers (can't point up/down and is not normal).
-	ILINE Vec3 GetN()
-	{
-		return Vec3
-		       (
-		  (bcolor[0] - 128.0f) / 127.5f,
-		  (bcolor[1] - 128.0f) / 127.5f,
-		  (bcolor[2] - 128.0f) / 127.5f
-		       );
-	}
-
 	AUTO_STRUCT_INFO;
 };
 
-struct Vec3f16 : public CryHalf4
+struct SCol
 {
-	inline Vec3f16()
+	union
 	{
-	}
-	inline Vec3f16(f32 _x, f32 _y, f32 _z)
+		uint32 icolor;
+		int8   ccolor[4];
+
+		struct { uint8 b, g, r, a; };
+		struct {  int8 z, y, x, w; };
+	};
+
+	//! Get normal vector from signed 8bit integers (can point up/down but is not normal).
+	ILINE Vec3 GetN() const
 	{
-		x = CryConvertFloatToHalf(_x);
-		y = CryConvertFloatToHalf(_y);
-		z = CryConvertFloatToHalf(_z);
-		w = CryConvertFloatToHalf(1.0f);
+		return Vec3
+		(
+			ccolor[0] * (1.0f / 127.0f),
+			ccolor[1] * (1.0f / 127.0f),
+			ccolor[2] * (1.0f / 127.0f)
+		);
 	}
-	float operator[](int i) const
+
+	//! Put normal vector to signed 8bit integers (can point up/down but is not normal).
+	ILINE void PutN(Vec3& n, int8 w)
 	{
-		assert(i <= 3);
-		return CryConvertHalfToFloat(((CryHalf*)this)[i]);
+		ccolor[0] = int8(n.x * 127.0f);
+		ccolor[1] = int8(n.y * 127.0f);
+		ccolor[2] = int8(n.z * 127.0f);
+		ccolor[3] = w;
 	}
-	inline Vec3f16& operator=(const Vec3& sl)
-	{
-		x = CryConvertFloatToHalf(sl.x);
-		y = CryConvertFloatToHalf(sl.y);
-		z = CryConvertFloatToHalf(sl.z);
-		w = CryConvertFloatToHalf(1.0f);
-		return *this;
-	}
-	inline Vec3f16& operator=(const Vec4& sl)
-	{
-		x = CryConvertFloatToHalf(sl.x);
-		y = CryConvertFloatToHalf(sl.y);
-		z = CryConvertFloatToHalf(sl.z);
-		w = CryConvertFloatToHalf(sl.w);
-		return *this;
-	}
-	inline Vec3 ToVec3() const
-	{
-		Vec3 v;
-		v.x = CryConvertHalfToFloat(x);
-		v.y = CryConvertHalfToFloat(y);
-		v.z = CryConvertHalfToFloat(z);
-		return v;
-	}
+
+	AUTO_STRUCT_INFO;
 };
 
 struct Vec2f16 : public CryHalf2
@@ -202,19 +187,93 @@ struct Vec2f16 : public CryHalf2
 	}
 };
 
+struct Vec3f16 : public CryHalf4
+{
+	inline Vec3f16()
+	{
+	}
+	inline Vec3f16(f32 _x, f32 _y, f32 _z)
+	{
+		x = CryConvertFloatToHalf(_x);
+		y = CryConvertFloatToHalf(_y);
+		z = CryConvertFloatToHalf(_z);
+		w = CryConvertFloatToHalf(1.0f);
+	}
+	float operator[](int i) const
+	{
+		assert(i <= 2);
+		return CryConvertHalfToFloat(((CryHalf*)this)[i]);
+	}
+	inline Vec3f16& operator=(const Vec3& sl)
+	{
+		x = CryConvertFloatToHalf(sl.x);
+		y = CryConvertFloatToHalf(sl.y);
+		z = CryConvertFloatToHalf(sl.z);
+		w = CryConvertFloatToHalf(1.0f);
+		return *this;
+	}
+	inline Vec3f16& operator=(const Vec4& sl)
+	{
+		x = CryConvertFloatToHalf(sl.x);
+		y = CryConvertFloatToHalf(sl.y);
+		z = CryConvertFloatToHalf(sl.z);
+		w = CryConvertFloatToHalf(1.0f);
+		return *this;
+	}
+	inline Vec3 ToVec3() const
+	{
+		Vec3 v;
+		v.x = CryConvertHalfToFloat(x);
+		v.y = CryConvertHalfToFloat(y);
+		v.z = CryConvertHalfToFloat(z);
+		return v;
+	}
+};
+
+struct Vec4f16 : public CryHalf4
+{
+	inline Vec4f16()
+	{
+	}
+	inline Vec4f16(f32 _x, f32 _y, f32 _z, f32 _w)
+	{
+		x = CryConvertFloatToHalf(_x);
+		y = CryConvertFloatToHalf(_y);
+		z = CryConvertFloatToHalf(_z);
+		w = CryConvertFloatToHalf(_w);
+	}
+	float operator[](int i) const
+	{
+		assert(i <= 3);
+		return CryConvertHalfToFloat(((CryHalf*)this)[i]);
+	}
+	inline Vec4f16& operator=(const Vec4& sl)
+	{
+		x = CryConvertFloatToHalf(sl.x);
+		y = CryConvertFloatToHalf(sl.y);
+		z = CryConvertFloatToHalf(sl.z);
+		w = CryConvertFloatToHalf(sl.w);
+		return *this;
+	}
+	inline Vec4 ToVec4() const
+	{
+		Vec4 v;
+		v.x = CryConvertHalfToFloat(x);
+		v.y = CryConvertHalfToFloat(y);
+		v.z = CryConvertHalfToFloat(z);
+		v.w = CryConvertHalfToFloat(w);
+		return v;
+	}
+};
+
 struct SVF_P3F_C4B_T2F
 {
 	Vec3 xyz;
 	UCol color;
 	Vec2 st;
 };
-struct SVF_TP3F_C4B_T2F
-{
-	Vec4 pos;
-	UCol color;
-	Vec2 st;
-};
-struct SVF_P3S_C4B_T2S
+
+struct SVF_P3H_C4B_T2H
 {
 	Vec3f16 xyz;
 	UCol    color;
@@ -223,7 +282,7 @@ struct SVF_P3S_C4B_T2S
 	AUTO_STRUCT_INFO;
 };
 
-struct SVF_P3F_C4B_T2S
+struct SVF_P3F_C4B_T2H
 {
 	Vec3    xyz;
 	UCol    color;
@@ -232,63 +291,76 @@ struct SVF_P3F_C4B_T2S
 	AUTO_STRUCT_INFO;
 };
 
-struct SVF_P3S_N4B_C4B_T2S
+struct SVF_P3H_C4B_T2H_N4C
 {
 	Vec3f16 xyz;
-	UCol    normal;
 	UCol    color;
 	Vec2f16 st;
+	SCol    normal;
 };
 
-struct SVF_P2S_N4B_C4B_T1F
+struct SVF_P2H_C4B_T1F_N4C
 {
-	CryHalf2 xy;
-	UCol     normal;
-	UCol     color;
-	float    z;
+	Vec2f16 xy;
+	UCol    color;
+	float   z;
+	SCol    normal;
 };
 
 struct SVF_T2F
 {
 	Vec2 st;
 };
-struct SVF_W4B_I4S
+
+struct SVF_W4B_I4U
 {
 	UCol   weights;
 	uint16 indices[4];
 };
+
 struct SVF_C4B_C4B
 {
 	UCol coef0;
 	UCol coef1;
 };
+
 struct SVF_P3F_P3F_I4B
 {
 	Vec3 thin;
 	Vec3 fat;
 	UCol index;
 };
+
 struct SVF_P3F
 {
 	Vec3 xyz;
 };
+
+struct SVF_P3H
+{
+	Vec3f16 xyz;
+};
+
 struct SVF_P3F_T3F
 {
 	Vec3 p;
 	Vec3 st;
 };
+
 struct SVF_P3F_T2F_T3F
 {
 	Vec3 p;
 	Vec2 st0;
 	Vec3 st1;
 };
+
 struct SVF_TP3F_T2F_T3F
 {
 	Vec4 p;
 	Vec2 st0;
 	Vec3 st1;
 };
+
 struct SVF_P2F_T4F_C4F
 {
 	Vec2 p;
@@ -337,9 +409,9 @@ ILINE int16 tPackB2S(const int16 s)
 
 #ifdef CRY_TYPE_SIMD4
 
-ILINE Vec4sf tPackF2Bv(const Vec4H<f32>& v)
+ILINE Vec4i16 tPackF2Bv(const Vec4H<f32>& v)
 {
-	Vec4sf vs;
+	Vec4i16 vs;
 
 	vs.x = tPackF2B(v.x);
 	vs.y = tPackF2B(v.y);
@@ -351,9 +423,9 @@ ILINE Vec4sf tPackF2Bv(const Vec4H<f32>& v)
 
 #endif
 
-ILINE Vec4sf tPackF2Bv(const Vec4f& v)
+ILINE Vec4i16 tPackF2Bv(const Vec4f& v)
 {
-	Vec4sf vs;
+	Vec4i16 vs;
 
 	vs.x = tPackF2B(v.x);
 	vs.y = tPackF2B(v.y);
@@ -363,9 +435,9 @@ ILINE Vec4sf tPackF2Bv(const Vec4f& v)
 	return vs;
 }
 
-ILINE Vec4sf tPackF2Bv(const Vec3& v)
+ILINE Vec4i16 tPackF2Bv(const Vec3& v)
 {
-	Vec4sf vs;
+	Vec4i16 vs;
 
 	vs.x = tPackF2B(v.x);
 	vs.y = tPackF2B(v.y);
@@ -375,7 +447,7 @@ ILINE Vec4sf tPackF2Bv(const Vec3& v)
 	return vs;
 }
 
-ILINE Vec4 tPackB2F(const Vec4sf& v)
+ILINE Vec4 tPackB2F(const Vec4i16& v)
 {
 	Vec4 vs;
 
@@ -387,7 +459,7 @@ ILINE Vec4 tPackB2F(const Vec4sf& v)
 	return vs;
 }
 
-ILINE void tPackB2F(const Vec4sf& v, Vec4& vDst)
+ILINE void tPackB2F(const Vec4i16& v, Vec4& vDst)
 {
 	vDst.x = tPackB2F(v.x);
 	vDst.y = tPackB2F(v.y);
@@ -395,7 +467,7 @@ ILINE void tPackB2F(const Vec4sf& v, Vec4& vDst)
 	vDst.w = 1.0f;
 }
 
-ILINE void tPackB2FScale(const Vec4sf& v, Vec4& vDst, const Vec3& vScale)
+ILINE void tPackB2FScale(const Vec4i16& v, Vec4& vDst, const Vec3& vScale)
 {
 	vDst.x = (float)v.x * vScale.x;
 	vDst.y = (float)v.y * vScale.y;
@@ -403,14 +475,14 @@ ILINE void tPackB2FScale(const Vec4sf& v, Vec4& vDst, const Vec3& vScale)
 	vDst.w = 1.0f;
 }
 
-ILINE void tPackB2FScale(const Vec4sf& v, Vec3& vDst, const Vec3& vScale)
+ILINE void tPackB2FScale(const Vec4i16& v, Vec3& vDst, const Vec3& vScale)
 {
 	vDst.x = (float)v.x * vScale.x;
 	vDst.y = (float)v.y * vScale.y;
 	vDst.z = (float)v.z * vScale.z;
 }
 
-ILINE void tPackB2F(const Vec4sf& v, Vec3& vDst)
+ILINE void tPackB2F(const Vec4i16& v, Vec3& vDst)
 {
 	vDst.x = tPackB2F(v.x);
 	vDst.y = tPackB2F(v.y);
@@ -425,11 +497,11 @@ struct SPipTangents
 	SPipTangents() {}
 
 private:
-	Vec4sf Tangent;
-	Vec4sf Bitangent;
+	Vec4i16 Tangent;
+	Vec4i16 Bitangent;
 
 public:
-	explicit SPipTangents(const Vec4sf& othert, const Vec4sf& otherb, const int16& othersign)
+	explicit SPipTangents(const Vec4i16& othert, const Vec4i16& otherb, const int16& othersign)
 	{
 		using namespace PackingSNorm;
 		Tangent = othert;
@@ -438,7 +510,7 @@ public:
 		Bitangent.w = PackingSNorm::tPackS2B(othersign);
 	}
 
-	explicit SPipTangents(const Vec4sf& othert, const Vec4sf& otherb, const SPipTangents& othersign)
+	explicit SPipTangents(const Vec4i16& othert, const Vec4i16& otherb, const SPipTangents& othersign)
 	{
 		Tangent = othert;
 		Tangent.w = othersign.Tangent.w;
@@ -446,7 +518,7 @@ public:
 		Bitangent.w = othersign.Bitangent.w;
 	}
 
-	explicit SPipTangents(const Vec4sf& othert, const Vec4sf& otherb)
+	explicit SPipTangents(const Vec4i16& othert, const Vec4i16& otherb)
 	{
 		Tangent = othert;
 		Bitangent = otherb;
@@ -454,14 +526,14 @@ public:
 
 	explicit SPipTangents(const Vec3& othert, const Vec3& otherb, const int16& othersign)
 	{
-		Tangent = Vec4sf(PackingSNorm::tPackF2B(othert.x), PackingSNorm::tPackF2B(othert.y), PackingSNorm::tPackF2B(othert.z), PackingSNorm::tPackS2B(othersign));
-		Bitangent = Vec4sf(PackingSNorm::tPackF2B(otherb.x), PackingSNorm::tPackF2B(otherb.y), PackingSNorm::tPackF2B(otherb.z), PackingSNorm::tPackS2B(othersign));
+		Tangent = Vec4i16(PackingSNorm::tPackF2B(othert.x), PackingSNorm::tPackF2B(othert.y), PackingSNorm::tPackF2B(othert.z), PackingSNorm::tPackS2B(othersign));
+		Bitangent = Vec4i16(PackingSNorm::tPackF2B(otherb.x), PackingSNorm::tPackF2B(otherb.y), PackingSNorm::tPackF2B(otherb.z), PackingSNorm::tPackS2B(othersign));
 	}
 
 	explicit SPipTangents(const Vec3& othert, const Vec3& otherb, const SPipTangents& othersign)
 	{
-		Tangent = Vec4sf(PackingSNorm::tPackF2B(othert.x), PackingSNorm::tPackF2B(othert.y), PackingSNorm::tPackF2B(othert.z), othersign.Tangent.w);
-		Bitangent = Vec4sf(PackingSNorm::tPackF2B(otherb.x), PackingSNorm::tPackF2B(otherb.y), PackingSNorm::tPackF2B(otherb.z), othersign.Bitangent.w);
+		Tangent = Vec4i16(PackingSNorm::tPackF2B(othert.x), PackingSNorm::tPackF2B(othert.y), PackingSNorm::tPackF2B(othert.z), othersign.Tangent.w);
+		Bitangent = Vec4i16(PackingSNorm::tPackF2B(otherb.x), PackingSNorm::tPackF2B(otherb.y), PackingSNorm::tPackF2B(otherb.z), othersign.Bitangent.w);
 	}
 
 	explicit SPipTangents(const Quat& other, const int16& othersign)
@@ -469,11 +541,11 @@ public:
 		Vec3 othert = other.GetColumn0();
 		Vec3 otherb = other.GetColumn1();
 
-		Tangent = Vec4sf(PackingSNorm::tPackF2B(othert.x), PackingSNorm::tPackF2B(othert.y), PackingSNorm::tPackF2B(othert.z), PackingSNorm::tPackS2B(othersign));
-		Bitangent = Vec4sf(PackingSNorm::tPackF2B(otherb.x), PackingSNorm::tPackF2B(otherb.y), PackingSNorm::tPackF2B(otherb.z), PackingSNorm::tPackS2B(othersign));
+		Tangent = Vec4i16(PackingSNorm::tPackF2B(othert.x), PackingSNorm::tPackF2B(othert.y), PackingSNorm::tPackF2B(othert.z), PackingSNorm::tPackS2B(othersign));
+		Bitangent = Vec4i16(PackingSNorm::tPackF2B(otherb.x), PackingSNorm::tPackF2B(otherb.y), PackingSNorm::tPackF2B(otherb.z), PackingSNorm::tPackS2B(othersign));
 	}
 
-	void ExportTo(Vec4sf& othert, Vec4sf& otherb) const
+	void ExportTo(Vec4i16& othert, Vec4i16& otherb) const
 	{
 		othert = Tangent;
 		otherb = Bitangent;
@@ -574,10 +646,10 @@ struct SPipQTangents
 	SPipQTangents() {}
 
 private:
-	Vec4sf QTangent;
+	Vec4i16 QTangent;
 
 public:
-	explicit SPipQTangents(const Vec4sf& other)
+	explicit SPipQTangents(const Vec4i16& other)
 	{
 		QTangent = other;
 	}
@@ -630,21 +702,52 @@ public:
 	friend struct SMeshQTangents;
 };
 
-struct SPipNormal : public Vec3
+struct SPipNormal
 {
 	SPipNormal() {}
 
-	explicit SPipNormal(const Vec3& othern)
+private:
+	Vec4i16 Normal;
+
+public:
+	explicit SPipNormal(const Vec4i16& other)
 	{
-		x = othern.x;
-		y = othern.y;
-		z = othern.z;
+		Normal = other;
+	}
+
+	explicit SPipNormal(const Vec3& other)
+	{
+		Normal = Vec4i16(PackingSNorm::tPackF2B(other.x), PackingSNorm::tPackF2B(other.y), PackingSNorm::tPackF2B(other.z), 0);
+	}
+
+	bool operator==(const SPipNormal& other) const
+	{
+		return
+		  Normal[0] == other.Normal[0] ||
+		  Normal[1] == other.Normal[1] ||
+		  Normal[2] == other.Normal[2];
+	}
+
+	bool operator!=(const SPipNormal& other) const
+	{
+		return !(*this == other);
+	}
+
+	void ExportTo(Vec4i16& other) const
+	{
+		other = Normal;
 	}
 
 	//! Get normal vector.
 	ILINE Vec3 GetN() const
 	{
-		return *this;
+		Vec3 n;
+
+		n.x = PackingSNorm::tPackB2F(Normal.x);
+		n.y = PackingSNorm::tPackB2F(Normal.y);
+		n.z = PackingSNorm::tPackB2F(Normal.z);
+
+		return n;
 	}
 
 	//! Get normal vector.
@@ -655,13 +758,25 @@ struct SPipNormal : public Vec3
 
 	void TransformBy(const Matrix34& trn)
 	{
-		*this = SPipNormal(trn.TransformVector(*this));
+		Vec3 nrm;
+		GetN(nrm);
+
+		nrm = trn.TransformVector(nrm);
+
+		*this = SPipNormal(nrm);
 	}
 
 	void TransformSafelyBy(const Matrix34& trn)
 	{
+		Vec3 nrm;
+		GetN(nrm);
+
+		nrm = trn.TransformVector(nrm);
+
 		// normalize in case "trn" wasn't length-preserving
-		*this = SPipNormal(trn.TransformVector(*this).normalize());
+		nrm.Normalize();
+
+		*this = SPipNormal(nrm);
 	}
 
 	friend struct SMeshNormal;
@@ -707,18 +822,19 @@ enum EStreamIDs
 //! Stream Masks (Used during updating).
 enum EStreamMasks
 {
-	VSM_GENERAL         = BIT(VSF_GENERAL),
-	VSM_TANGENTS        = BIT(VSF_TANGENTS) | BIT( VSF_QTANGENTS),
-	VSM_HWSKIN          = BIT(VSF_HWSKIN_INFO),
-	VSM_VERTEX_VELOCITY = BIT(VSF_VERTEX_VELOCITY),
+	VSM_GENERAL            = BIT(VSF_GENERAL),
+	VSM_TANGENTS           = BIT(VSF_TANGENTS) | BIT( VSF_QTANGENTS),
+	VSM_HWSKIN             = BIT(VSF_HWSKIN_INFO),
+	VSM_VERTEX_VELOCITY    = BIT(VSF_VERTEX_VELOCITY),
 #if ENABLE_NORMALSTREAM_SUPPORT
-	VSM_NORMALS         = BIT(VSF_NORMALS),
+	VSM_NORMALS            = BIT(VSF_NORMALS),
 #endif
 
-	VSM_MORPHBUDDY      = BIT(VSF_MORPHBUDDY),
-	VSM_INSTANCED       = BIT(VSF_INSTANCED),
+	VSM_MORPHBUDDY         = BIT(VSF_MORPHBUDDY),
+	VSM_INSTANCED          = BIT(VSF_INSTANCED),
+	VSM_MORPHBUDDY_WEIGHTS = BIT(VSF_MORPHBUDDY_WEIGHTS),
 
-	VSM_MASK            = MASK(VSF_NUM),
+	VSM_MASK               = MASK(VSF_NUM),
 };
 
 //==================================================================================================================

@@ -77,7 +77,7 @@ ILINE Quat MeshTangentFrameToQTangent(const SMeshTangents& tangents)
 	return QTangent::FromFrameReflection16Safe(frame, reflection);
 }
 
-ILINE Quat MeshTangentFrameToQTangent(const Vec4sf& tangent, const Vec4sf& bitangent)
+ILINE Quat MeshTangentFrameToQTangent(const Vec4i16& tangent, const Vec4i16& bitangent)
 {
 	return MeshTangentFrameToQTangent(SMeshTangents(tangent, bitangent));
 }
@@ -88,8 +88,8 @@ ILINE Quat MeshTangentFrameToQTangent(const SPipTangents& tangents)
 }
 
 ILINE bool MeshTangentsFrameToQTangents(
-  const Vec4sf* pTangent, const uint tangentStride,
-  const Vec4sf* pBitangent, const uint bitangentStride, const uint count,
+  const Vec4i16* pTangent, const uint tangentStride,
+  const Vec4i16* pBitangent, const uint bitangentStride, const uint count,
   SPipQTangents* pQTangents, const uint qtangentStride)
 {
 	Quat qtangent;
@@ -98,8 +98,8 @@ ILINE bool MeshTangentsFrameToQTangents(
 		qtangent = MeshTangentFrameToQTangent(*pTangent, *pBitangent);
 		SMeshQTangents(qtangent).ExportTo(*pQTangents);
 
-		pTangent = (const Vec4sf*)(((const uint8*)pTangent) + tangentStride);
-		pBitangent = (const Vec4sf*)(((const uint8*)pBitangent) + bitangentStride);
+		pTangent = (const Vec4i16*)(((const uint8*)pTangent) + tangentStride);
+		pBitangent = (const Vec4i16*)(((const uint8*)pBitangent) + bitangentStride);
 		pQTangents = (SPipQTangents*)(((uint8*)pQTangents) + qtangentStride);
 	}
 	return true;

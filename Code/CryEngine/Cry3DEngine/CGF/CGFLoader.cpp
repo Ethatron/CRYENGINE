@@ -1800,9 +1800,9 @@ bool CLoaderCGF::ProcessSkinning()
 
 		IntSkinVertex v;
 
-		if (pMesh->m_pColor0)
+		if (pMesh->m_pColors)
 		{
-			v.color = pMesh->m_pColor0[nVert].GetRGBA();
+			v.color = pMesh->m_pColors[nVert].GetRGBA();
 		}
 		else
 		{
@@ -2138,7 +2138,7 @@ bool CLoaderCGF::ProcessSkinning()
 			{
 				const uint32 i = pSkinningInfo->m_arrExt2IntMap[e];
 
-				pMesh->m_pNorms[e].RotateSafelyBy(oldWorldTM);
+				pMesh->m_pNormals[e].RotateSafelyBy(oldWorldTM);
 				pMesh->m_pTangents[i].RotateSafelyBy(oldWorldTM);
 			}
 		}
@@ -2762,7 +2762,7 @@ bool CLoaderCGF::LoadGeomChunk(CNodeCGF* pNode, IChunkFile::ChunkDesc* pChunkDes
 			pMesh->ReallocStream(CMesh::TEXCOORDS, nVertsNew);
 			if (!mesh.m_colors.empty() || !mesh.m_alphas.empty())
 			{
-				pMesh->ReallocStream(CMesh::COLORS_0, nVertsNew);
+				pMesh->ReallocStream(CMesh::COLORS, nVertsNew);
 			}
 
 			for (int i = 0; i < nVertsNew; ++i)
@@ -2771,7 +2771,7 @@ bool CLoaderCGF::LoadGeomChunk(CNodeCGF* pNode, IChunkFile::ChunkDesc* pChunkDes
 
 				pMesh->m_pPositions[i] = mesh.m_positions[origVertex];
 
-				pMesh->m_pNorms[i] = SMeshNormal(mesh.m_normals[origVertex]);
+				pMesh->m_pNormals[i] = SMeshNormal(mesh.m_normals[origVertex]);
 
 				pMesh->m_pTopologyIds[i] = mesh.m_topologyIds[origVertex];
 
@@ -2780,7 +2780,7 @@ bool CLoaderCGF::LoadGeomChunk(CNodeCGF* pNode, IChunkFile::ChunkDesc* pChunkDes
 					pMesh->m_pTexCoord[i] = SMeshTexCoord(mesh.m_texCoords[origVertex].x, mesh.m_texCoords[origVertex].y);
 				}
 
-				if (pMesh->m_pColor0)
+				if (pMesh->m_pColors)
 				{
 					uint8 r = 0xFF;
 					uint8 g = 0xFF;
@@ -2797,7 +2797,7 @@ bool CLoaderCGF::LoadGeomChunk(CNodeCGF* pNode, IChunkFile::ChunkDesc* pChunkDes
 						a = mesh.m_alphas[origVertex];
 					}
 
-					pMesh->m_pColor0[i] = SMeshColor(r, g, b, a);
+					pMesh->m_pColors[i] = SMeshColor(r, g, b, a);
 				}
 			}
 		}
@@ -3464,7 +3464,7 @@ bool CLoaderCGF::LoadCompiledMeshChunk(CNodeCGF* pNode, IChunkFile::ChunkDesc* p
 	}
 
 	// Read normals stream.
-	ok = ok && LoadStreamChunk<Vec3>(mesh, chunk, CGF_STREAM_NORMALS, CMesh::NORMALS);
+	ok = ok && LoadStreamChunk<SMeshNormal>(mesh, chunk, CGF_STREAM_NORMALS, CMesh::NORMALS);
 
 	// Read Texture coordinates stream.
 	ok = ok && LoadStreamChunk<SMeshTexCoord>(mesh, chunk, CGF_STREAM_TEXCOORDS, CMesh::TEXCOORDS);
@@ -3473,18 +3473,17 @@ bool CLoaderCGF::LoadCompiledMeshChunk(CNodeCGF* pNode, IChunkFile::ChunkDesc* p
 	ok = ok && LoadIndexStreamChunk(mesh, chunk);
 
 	// Read colors stream.
-	ok = ok && LoadStreamChunk<SMeshColor>(mesh, chunk, CGF_STREAM_COLORS, CMesh::COLORS_0);
-	ok = ok && LoadStreamChunk<SMeshColor>(mesh, chunk, CGF_STREAM_COLORS2, CMesh::COLORS_1);
+	ok = ok && LoadStreamChunk<SMeshColor>(mesh, chunk, CGF_STREAM_COLORS, CMesh::COLORS);
 
 	// Read Vertex Mapping.
-	ok = ok && LoadStreamChunk<int>(mesh, chunk, CGF_STREAM_VERT_MATS, CMesh::VERT_MATS);
+	ok = ok && LoadStreamChunk<int>(mesh, chunk, CGF_STREAM_SUBSETIDS, CMesh::SUBSET_IDS);
 
 	// Read Tangent Streams.
 	ok = ok && LoadStreamChunk<SMeshTangents>(mesh, chunk, CGF_STREAM_TANGENTS, CMesh::TANGENTS);
 	ok = ok && LoadStreamChunk<SMeshQTangents>(mesh, chunk, CGF_STREAM_QTANGENTS, CMesh::QTANGENTS);
 
 	// Read interleaved stream.
-	ok = ok && LoadStreamChunk<SVF_P3S_C4B_T2S>(mesh, chunk, CGF_STREAM_P3S_C4B_T2S, CMesh::P3S_C4B_T2S);
+	ok = ok && LoadStreamChunk<SVF_P3H_C4B_T2H>(mesh, chunk, CGF_STREAM_P3S_C4B_T2S, CMesh::P3S_C4B_T2S);
 
 	ok = ok && LoadBoneMappingStreamChunk(mesh, chunk, globalBonesPerSubset);
 

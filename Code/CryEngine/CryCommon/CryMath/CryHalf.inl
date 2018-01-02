@@ -141,6 +141,56 @@ struct CryHalf2
 	AUTO_STRUCT_INFO;
 };
 
+struct CryHalf3
+{
+	CryHalf x;
+	CryHalf y;
+	CryHalf z;
+
+	CryHalf3()
+	{
+	}
+	CryHalf3(CryHalf _x, CryHalf _y, CryHalf _z)
+		: x(_x)
+		, y(_y)
+		, z(_z)
+	{
+	}
+	CryHalf3(const CryHalf* const __restrict pArray)
+	{
+		x = pArray[0];
+		y = pArray[1];
+		z = pArray[2];
+	}
+	CryHalf3(float _x, float _y, float _z)
+	{
+		x = CryConvertFloatToHalf(_x);
+		y = CryConvertFloatToHalf(_y);
+		z = CryConvertFloatToHalf(_z);
+	}
+	CryHalf3(const float* const __restrict pArray)
+	{
+		x = CryConvertFloatToHalf(pArray[0]);
+		y = CryConvertFloatToHalf(pArray[1]);
+		z = CryConvertFloatToHalf(pArray[2]);
+	}
+	CryHalf3& operator=(const CryHalf3& Half4)
+	{
+		x = Half4.x;
+		y = Half4.y;
+		z = Half4.z;
+		return *this;
+	}
+	bool operator!=(const CryHalf3& rhs) const
+	{
+		return x != rhs.x || y != rhs.y || z != rhs.z;
+	}
+
+	void GetMemoryUsage(ICrySizer* pSizer) const {}
+
+	AUTO_STRUCT_INFO;
+};
+
 struct CryHalf4
 {
 	CryHalf x;

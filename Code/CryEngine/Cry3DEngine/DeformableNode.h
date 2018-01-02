@@ -35,7 +35,7 @@ protected:
 	                          , CRenderObject* pRenderObject, const AABB& bbox
 	                          , const SRenderingPassInfo& passInfo
 	                          , _smart_ptr<IRenderMesh>&
-	                          , strided_pointer<SVF_P3S_C4B_T2S>
+	                          , strided_pointer<SVF_P3H_C4B_T2H>
 	                          , strided_pointer<SPipTangents>
 	                          , vtx_idx* idxBuf
 	                          , size_t& iv

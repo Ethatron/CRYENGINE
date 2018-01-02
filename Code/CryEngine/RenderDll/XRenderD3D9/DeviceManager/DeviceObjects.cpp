@@ -155,6 +155,7 @@ std::vector<InputLayoutHandle> CDeviceObjectFactory::s_InputLayoutPermutations[1
 
 static const D3D11_INPUT_ELEMENT_DESC VertexDecl_Empty[] = { {} }; // Empty
 
+// VSF_GENERAL:
 static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P3F_C4B_T2F[] = 
 {
 	{ "POSITION"    , 0, DXGI_FORMAT_R32G32B32_FLOAT   , 0, offsetof(SVF_P3F_C4B_T2F     , xyz  ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -162,35 +163,48 @@ static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P3F_C4B_T2F[] =
 	{ "TEXCOORD"    , 0, DXGI_FORMAT_R32G32_FLOAT      , 0, offsetof(SVF_P3F_C4B_T2F     , st   ), D3D11_INPUT_PER_VERTEX_DATA, 0 }
 };
 
-static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P3S_C4B_T2S[] =
+// VSF_GENERAL (partially compacted):
+static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P3F_C4B_T2H[] =
 {
-	{ "POSITION"    , 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0, offsetof(SVF_P3S_C4B_T2S     , xyz  ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "COLOR"       , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , 0, offsetof(SVF_P3S_C4B_T2S     , color), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "TEXCOORD"    , 0, DXGI_FORMAT_R16G16_FLOAT      , 0, offsetof(SVF_P3S_C4B_T2S     , st   ), D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	{ "POSITION"    , 0, DXGI_FORMAT_R32G32B32_FLOAT   , 0, offsetof(SVF_P3F_C4B_T2H     , xyz  ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "COLOR"       , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , 0, offsetof(SVF_P3F_C4B_T2H     , color), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "TEXCOORD"    , 0, DXGI_FORMAT_R16G16_FLOAT      , 0, offsetof(SVF_P3F_C4B_T2H     , st   ), D3D11_INPUT_PER_VERTEX_DATA, 0 }
 };
 
-static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P3S_N4B_C4B_T2S[] =
+// VSF_GENERAL (compacted):
+static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P3H_C4B_T2H[] =
 {
-	{ "POSITION"    , 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0, offsetof(SVF_P3S_N4B_C4B_T2S, xyz   ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "NORMAL"      , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , 0, offsetof(SVF_P3S_N4B_C4B_T2S, normal), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "COLOR"       , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , 0, offsetof(SVF_P3S_N4B_C4B_T2S, color ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "TEXCOORD"    , 0, DXGI_FORMAT_R16G16_FLOAT      , 0, offsetof(SVF_P3S_N4B_C4B_T2S, st    ), D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	{ "POSITION"    , 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0, offsetof(SVF_P3H_C4B_T2H     , xyz  ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "COLOR"       , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , 0, offsetof(SVF_P3H_C4B_T2H     , color), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "TEXCOORD"    , 0, DXGI_FORMAT_R16G16_FLOAT      , 0, offsetof(SVF_P3H_C4B_T2H     , st   ), D3D11_INPUT_PER_VERTEX_DATA, 0 }
 };
 
-static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P3F_C4B_T4B_N3F2[] = // ParticleVT.cfi: app2vertParticleGeneral
+// VSF_GENERAL (compacted + merged compacted normals):
+static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P3H_C4B_T2H_N4C[] =
+{
+	{ "POSITION"    , 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0, offsetof(SVF_P3H_C4B_T2H_N4C, xyz   ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "COLOR"       , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , 0, offsetof(SVF_P3H_C4B_T2H_N4C, color ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "TEXCOORD"    , 0, DXGI_FORMAT_R16G16_FLOAT      , 0, offsetof(SVF_P3H_C4B_T2H_N4C, st    ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "NORMAL"      , 0, DXGI_FORMAT_R8G8B8A8_SNORM    , 0, offsetof(SVF_P3H_C4B_T2H_N4C, normal), D3D11_INPUT_PER_VERTEX_DATA, 0 }
+};
+
+// Terrain (low resolution xy and high resolution z):
+static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P2H_C4B_T1F_N4C[] =
+{
+	{ "POSITION"    , 0, DXGI_FORMAT_R16G16_FLOAT      , 0, offsetof(SVF_P2H_C4B_T1F_N4C, xy    ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "COLOR"       , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , 0, offsetof(SVF_P2H_C4B_T1F_N4C, color ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "TEXCOORD"    , 0, DXGI_FORMAT_R32_FLOAT         , 0, offsetof(SVF_P2H_C4B_T1F_N4C, z     ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "NORMAL"      , 0, DXGI_FORMAT_R8G8B8A8_SNORM    , 0, offsetof(SVF_P2H_C4B_T1F_N4C, normal), D3D11_INPUT_PER_VERTEX_DATA, 0 }
+};
+
+// ParticleVT.cfi: app2vertParticleGeneral
+static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P3F_C4B_T4B_N3F2[] =
 {
 	{ "POSITION"    , 0, DXGI_FORMAT_R32G32B32_FLOAT   , 0, offsetof(SVF_P3F_C4B_T4B_N3F2, xyz  ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	{ "COLOR"       , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , 0, offsetof(SVF_P3F_C4B_T4B_N3F2, color), D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	{ "TEXCOORD"    , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , 0, offsetof(SVF_P3F_C4B_T4B_N3F2, st   ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	{ "AXIS"        , 0, DXGI_FORMAT_R32G32B32_FLOAT   , 0, offsetof(SVF_P3F_C4B_T4B_N3F2, xaxis), D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	{ "AXIS"        , 1, DXGI_FORMAT_R32G32B32_FLOAT   , 0, offsetof(SVF_P3F_C4B_T4B_N3F2, yaxis), D3D11_INPUT_PER_VERTEX_DATA, 0 }
-};
-
-static const D3D11_INPUT_ELEMENT_DESC VertexDecl_TP3F_C4B_T2F[] =
-{
-	{ "POSITION"    , 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(SVF_TP3F_C4B_T2F    , pos  ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "COLOR"       , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , 0, offsetof(SVF_TP3F_C4B_T2F    , color), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "TEXCOORD"    , 0, DXGI_FORMAT_R32G32_FLOAT      , 0, offsetof(SVF_TP3F_C4B_T2F    , st   ), D3D11_INPUT_PER_VERTEX_DATA, 0 }
 };
 
 static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P3F_T3F[] =
@@ -210,36 +224,25 @@ static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P3F[] =
 {
 	{ "POSITION"    , 0, DXGI_FORMAT_R32G32B32_FLOAT   , 0, offsetof(SVF_P3F             , xyz  ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
 
-	// TODO: remove this from the definition, it's a workaround for ZPass shaders expecting COLOR/TEXCOORD
+	// TODO: remove this from the definition, it's a workaround for Z-PrePass shaders expecting COLOR/TEXCOORD
 	{ "COLOR"       , 0, DXGI_FORMAT_R32G32B32_FLOAT   , 0, offsetof(SVF_P3F             , xyz  ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	{ "TEXCOORD"    , 0, DXGI_FORMAT_R32G32B32_FLOAT   , 0, offsetof(SVF_P3F             , xyz  ), D3D11_INPUT_PER_VERTEX_DATA, 0 }
 };
 
-static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P2S_N4B_C4B_T1F[] =
+static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P3H[] =
 {
-	{ "POSITION"    , 0, DXGI_FORMAT_R16G16_FLOAT      , 0, offsetof(SVF_P2S_N4B_C4B_T1F, xy    ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "NORMAL"      , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , 0, offsetof(SVF_P2S_N4B_C4B_T1F, normal), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "COLOR"       , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , 0, offsetof(SVF_P2S_N4B_C4B_T1F, color ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "TEXCOORD"    , 0, DXGI_FORMAT_R32_FLOAT         , 0, offsetof(SVF_P2S_N4B_C4B_T1F, z     ), D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	{ "POSITION"    , 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0, offsetof(SVF_P3H             , xyz  ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+
+	// TODO: remove this from the definition, it's a workaround for Z-PrePass shaders expecting COLOR/TEXCOORD
+	{ "COLOR"       , 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0, offsetof(SVF_P3H             , xyz  ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "TEXCOORD"    , 0, DXGI_FORMAT_R16G16B16A16_FLOAT, 0, offsetof(SVF_P3H             , xyz  ), D3D11_INPUT_PER_VERTEX_DATA, 0 }
 };
 
-static const D3D11_INPUT_ELEMENT_DESC VertexDecl_P3F_C4B_T2S[] =
-{
-	{ "POSITION"    , 0, DXGI_FORMAT_R32G32B32_FLOAT   , 0, offsetof(SVF_P3F_C4B_T2S     , xyz  ), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "COLOR"       , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , 0, offsetof(SVF_P3F_C4B_T2S     , color), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "TEXCOORD"    , 0, DXGI_FORMAT_R16G16_FLOAT      , 0, offsetof(SVF_P3F_C4B_T2S     , st   ), D3D11_INPUT_PER_VERTEX_DATA, 0 }
-};
-
+#ifdef NORM_FLOATS
 static const D3D11_INPUT_ELEMENT_DESC VertexDecl_T4F_B4F[] =
 {
 	{ "TANGENT"     , 0, DXGI_FORMAT_R32G32B32A32_FLOAT, VSF_TANGENTS,  0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	{ "BITANGENT"   , 0, DXGI_FORMAT_R32G32B32A32_FLOAT, VSF_TANGENTS, 16, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-};
-
-static const D3D11_INPUT_ELEMENT_DESC VertexDecl_T4S_B4S[] =
-{
-	{ "TANGENT"     , 0, DXGI_FORMAT_R16G16B16A16_SNORM, VSF_TANGENTS,  0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "BITANGENT"   , 0, DXGI_FORMAT_R16G16B16A16_SNORM, VSF_TANGENTS,  8, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 };
 
 static const D3D11_INPUT_ELEMENT_DESC VertexDecl_Q4F[] =
@@ -247,20 +250,32 @@ static const D3D11_INPUT_ELEMENT_DESC VertexDecl_Q4F[] =
 	{ "TANGENT"     , 0, DXGI_FORMAT_R32G32B32A32_FLOAT, VSF_QTANGENTS, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 };
 
+static const D3D11_INPUT_ELEMENT_DESC VertexDecl_N3F[] =
+{
+	{ "NORMAL"      , 0, DXGI_FORMAT_R32G32B32_FLOAT   , VSF_NORMALS  , 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+};
+#else
+static const D3D11_INPUT_ELEMENT_DESC VertexDecl_T4S_B4S[] =
+{
+	{ "TANGENT"     , 0, DXGI_FORMAT_R16G16B16A16_SNORM, VSF_TANGENTS,  0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "BITANGENT"   , 0, DXGI_FORMAT_R16G16B16A16_SNORM, VSF_TANGENTS,  8, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+};
+
 static const D3D11_INPUT_ELEMENT_DESC VertexDecl_Q4S[] =
 {
 	{ "TANGENT"     , 0, DXGI_FORMAT_R16G16B16A16_SNORM, VSF_QTANGENTS, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 };
 
-static const D3D11_INPUT_ELEMENT_DESC VertexDecl_N3F[] =
+static const D3D11_INPUT_ELEMENT_DESC VertexDecl_N3S[] =
 {
-	{ "NORMAL"      , 0, DXGI_FORMAT_R32G32B32_FLOAT   , VSF_NORMALS  , 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	{ "NORMAL"      , 0, DXGI_FORMAT_R16G16B16A16_SNORM, VSF_NORMALS  , 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 };
+#endif
 
-static const D3D11_INPUT_ELEMENT_DESC VertexDecl_W4B_I4S[] =
+static const D3D11_INPUT_ELEMENT_DESC VertexDecl_W4B_I4U[] =
 {
-	{ "BLENDWEIGHT" , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , VSF_HWSKIN_INFO, offsetof(SVF_W4B_I4S, weights), D3D11_INPUT_PER_VERTEX_DATA, 0 },
-	{ "BLENDINDICES", 0, DXGI_FORMAT_R16G16B16A16_SINT , VSF_HWSKIN_INFO, offsetof(SVF_W4B_I4S, indices), D3D11_INPUT_PER_VERTEX_DATA, 0 }
+	{ "BLENDWEIGHT" , 0, DXGI_FORMAT_R8G8B8A8_UNORM    , VSF_HWSKIN_INFO, offsetof(SVF_W4B_I4U, weights), D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	{ "BLENDINDICES", 0, DXGI_FORMAT_R16G16B16A16_UINT , VSF_HWSKIN_INFO, offsetof(SVF_W4B_I4U, indices), D3D11_INPUT_PER_VERTEX_DATA, 0 }
 };
 
 static const D3D11_INPUT_ELEMENT_DESC VertexDecl_V3F[] =
@@ -289,26 +304,30 @@ VertexDecls[EDefaultInputLayouts::PreAllocated] =
 
 	// Base stream
 	{ CRY_ARRAY_COUNT(VertexDecl_P3F_C4B_T2F     ), VertexDecl_P3F_C4B_T2F      },
-	{ CRY_ARRAY_COUNT(VertexDecl_P3S_C4B_T2S     ), VertexDecl_P3S_C4B_T2S      },
-	{ CRY_ARRAY_COUNT(VertexDecl_P3S_N4B_C4B_T2S ), VertexDecl_P3S_N4B_C4B_T2S  },
+	{ CRY_ARRAY_COUNT(VertexDecl_P3F_C4B_T2H     ), VertexDecl_P3F_C4B_T2H      },
+	{ CRY_ARRAY_COUNT(VertexDecl_P3H_C4B_T2H     ), VertexDecl_P3H_C4B_T2H      },
+	{ CRY_ARRAY_COUNT(VertexDecl_P3H_C4B_T2H_N4C ), VertexDecl_P3H_C4B_T2H_N4C  },
 
 	{ CRY_ARRAY_COUNT(VertexDecl_P3F_C4B_T4B_N3F2), VertexDecl_P3F_C4B_T4B_N3F2 },
-	{ CRY_ARRAY_COUNT(VertexDecl_TP3F_C4B_T2F    ), VertexDecl_TP3F_C4B_T2F     },
 	{ CRY_ARRAY_COUNT(VertexDecl_P3F_T3F         ), VertexDecl_P3F_T3F          },
 	{ CRY_ARRAY_COUNT(VertexDecl_P3F_T2F_T3F     ), VertexDecl_P3F_T2F_T3F      },
 
 	{ CRY_ARRAY_COUNT(VertexDecl_P3F             ), VertexDecl_P3F              },
+	{ CRY_ARRAY_COUNT(VertexDecl_P3H             ), VertexDecl_P3H              },
 
-	{ CRY_ARRAY_COUNT(VertexDecl_P2S_N4B_C4B_T1F ), VertexDecl_P2S_N4B_C4B_T1F  },
-	{ CRY_ARRAY_COUNT(VertexDecl_P3F_C4B_T2S     ), VertexDecl_P3F_C4B_T2S      },
+	{ CRY_ARRAY_COUNT(VertexDecl_P2H_C4B_T1F_N4C ), VertexDecl_P2H_C4B_T1F_N4C  },
 
 	// Additional streams
+#ifdef NORM_FLOATS
 	{ CRY_ARRAY_COUNT(VertexDecl_T4F_B4F         ), VertexDecl_T4F_B4F          },
-	{ CRY_ARRAY_COUNT(VertexDecl_T4S_B4S         ), VertexDecl_T4S_B4S          },
 	{ CRY_ARRAY_COUNT(VertexDecl_Q4F             ), VertexDecl_Q4F              },
-	{ CRY_ARRAY_COUNT(VertexDecl_Q4S             ), VertexDecl_Q4S              },
 	{ CRY_ARRAY_COUNT(VertexDecl_N3F             ), VertexDecl_N3F              },
-	{ CRY_ARRAY_COUNT(VertexDecl_W4B_I4S         ), VertexDecl_W4B_I4S          },
+#else
+	{ CRY_ARRAY_COUNT(VertexDecl_T4S_B4S         ), VertexDecl_T4S_B4S          },
+	{ CRY_ARRAY_COUNT(VertexDecl_Q4S             ), VertexDecl_Q4S              },
+	{ CRY_ARRAY_COUNT(VertexDecl_N3S             ), VertexDecl_N3S              },
+#endif
+	{ CRY_ARRAY_COUNT(VertexDecl_W4B_I4U         ), VertexDecl_W4B_I4U          },
 	{ CRY_ARRAY_COUNT(VertexDecl_V3F             ), VertexDecl_V3F              },
 	{ CRY_ARRAY_COUNT(VertexDecl_W2F             ), VertexDecl_W2F              },
 
@@ -417,16 +436,17 @@ InputLayoutHandle CDeviceObjectFactory::GetOrCreateInputLayoutHandle(const SShad
 					InputLayoutHandle AttachmentFormat = EDefaultInputLayouts::Unspecified;
 					switch (n)
 					{
-					#ifdef TANG_FLOATS
+					#ifdef NORM_FLOATS
 						case VSF_TANGENTS       : AttachmentFormat = EDefaultInputLayouts::T4F_B4F; break;
 						case VSF_QTANGENTS      : AttachmentFormat = EDefaultInputLayouts::Q4F; break;
+						case VSF_NORMALS        : AttachmentFormat = EDefaultInputLayouts::N3F; break;
 					#else
 						case VSF_TANGENTS       : AttachmentFormat = EDefaultInputLayouts::T4S_B4S; break;
 						case VSF_QTANGENTS      : AttachmentFormat = EDefaultInputLayouts::Q4S; break;
+						case VSF_NORMALS        : AttachmentFormat = EDefaultInputLayouts::N3S; break;
 					#endif
-						case VSF_HWSKIN_INFO    : AttachmentFormat = EDefaultInputLayouts::W4B_I4S; break;
+						case VSF_HWSKIN_INFO    : AttachmentFormat = EDefaultInputLayouts::W4B_I4U; break;
 						case VSF_VERTEX_VELOCITY: AttachmentFormat = EDefaultInputLayouts::V3F; break;
-						case VSF_NORMALS        : AttachmentFormat = EDefaultInputLayouts::N3F; break;
 					}
 
 					const std::pair<SInputLayout, CDeviceInputLayout*>& addLayout = LookupInputLayout(AttachmentFormat);
@@ -548,7 +568,7 @@ void CDeviceGraphicsPSODesc::InitWithDefaults()
 	m_StencilState = STENC_FUNC(FSS_STENCFUNC_ALWAYS) | STENCOP_FAIL(FSS_STENCOP_KEEP) | STENCOP_ZFAIL(FSS_STENCOP_KEEP) | STENCOP_PASS(FSS_STENCOP_KEEP);
 	m_StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK;
 	m_StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
-	m_VertexFormat = EDefaultInputLayouts::P3F_C4B_T2S;
+	m_VertexFormat = EDefaultInputLayouts::P3F_C4B_T2H;
 	m_CullMode = eCULL_Back;
 	m_PrimitiveType = eptTriangleList;
 	m_bDepthClip = true;

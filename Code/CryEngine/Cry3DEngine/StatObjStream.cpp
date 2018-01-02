@@ -335,7 +335,7 @@ int CStatObj::GetStreamableContentMemoryUsage(bool bJustForDebug)
 	{
 		//TODO: Need to have a function to calculate memory usage.
 		//m_nMergedMemoryUsage = m_pMergedRenderMesh->GetAllocatedBytes(true);
-		m_nMergedMemoryUsage = m_pMergedRenderMesh->GetVerticesCount() * (sizeof(SPipTangents) + sizeof(SVF_P3S_C4B_T2S)) + m_pMergedRenderMesh->GetIndicesCount() * sizeof(uint16);
+		m_nMergedMemoryUsage = m_pMergedRenderMesh->GetVerticesCount() * (sizeof(SPipTangents) + sizeof(SVF_P3H_C4B_T2H)) + m_pMergedRenderMesh->GetIndicesCount() * sizeof(vtx_idx);
 	}
 	else if (!GetCVars()->e_StatObjMerge)
 	{
