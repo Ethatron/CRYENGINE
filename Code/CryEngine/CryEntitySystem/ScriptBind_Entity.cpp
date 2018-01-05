@@ -8196,14 +8196,10 @@ int CScriptBind_Entity::IStatObjRayIntersect(IStatObj* pStatObj, const Vec3& ray
 {
 	IRenderMesh* pRenderMesh = pStatObj->GetRenderMesh();
 
-	int posStride = 0;
-	int uvStride = 0;
-
-	byte* pPosBuf = pRenderMesh->GetPosPtr(posStride, FSL_READ);
-	byte* pUVBuf = pRenderMesh->GetUVPtr(uvStride, FSL_READ);
-
 	int indexCount = pRenderMesh->GetIndicesCount();
-	vtx_idx* pIndex = pRenderMesh->GetIndexPtr(FSL_READ);
+	const auto pIndex = pRenderMesh->GetIndices(FSL_READ);
+	const auto pPosBuf = pRenderMesh->GetPositions(FSL_READ);
+	const auto pUVBuf = pRenderMesh->GetTexCoords(FSL_READ);
 
 	int hitCount = 0;
 
@@ -8212,9 +8208,9 @@ int CScriptBind_Entity::IStatObjRayIntersect(IStatObj* pStatObj, const Vec3& ray
 	for (int i = 0; i < indexCount; i += 3)
 	{
 		bool backfacing = false;
-		const Vec3& v0 = *(Vec3*)&pPosBuf[posStride * pIndex[i + 0]];
-		const Vec3& v1 = *(Vec3*)&pPosBuf[posStride * pIndex[i + 1]];
-		const Vec3& v2 = *(Vec3*)&pPosBuf[posStride * pIndex[i + 2]];
+		const Vec3& v0 = pPosBuf[pIndex[i + 0]];
+		const Vec3& v1 = pPosBuf[pIndex[i + 1]];
+		const Vec3& v2 = pPosBuf[pIndex[i + 2]];
 
 		Vec3 e1 = v1 - v0;
 		Vec3 e2 = v2 - v0;
@@ -8272,9 +8268,9 @@ int CScriptBind_Entity::IStatObjRayIntersect(IStatObj* pStatObj, const Vec3& ray
 		result.v0 = v0;
 		result.v1 = v1;
 		result.v2 = v2;
-		result.uv0 = *(Vec2*)&pUVBuf[uvStride * pIndex[i + 0]];
-		result.uv1 = *(Vec2*)&pUVBuf[uvStride * pIndex[i + 1]];
-		result.uv2 = *(Vec2*)&pUVBuf[uvStride * pIndex[i + 2]];
+		result.uv0 = pUVBuf[pIndex[i + 0]];
+		result.uv1 = pUVBuf[pIndex[i + 1]];
+		result.uv2 = pUVBuf[pIndex[i + 2]];
 		result.backface = backfacing;
 		result.material[0] = 0;
 

@@ -120,6 +120,21 @@ struct UCol
 		struct { uint8 z, y, x, w; };
 	};
 
+	bool operator != (const UCol& other) const { return dcolor != other.dcolor; }
+	bool operator == (const UCol& other) const { return dcolor == other.dcolor; }
+
+	//! Get vector from unsigned 8bit integers.
+	ILINE Vec4 GetV() const
+	{
+		return Vec4
+		(
+			bcolor[0] * (1.0f / 255.0f),
+			bcolor[1] * (1.0f / 255.0f),
+			bcolor[2] * (1.0f / 255.0f),
+			bcolor[3] * (1.0f / 255.0f)
+		);
+	}
+
 	AUTO_STRUCT_INFO;
 };
 
@@ -133,6 +148,9 @@ struct SCol
 		struct { uint8 b, g, r, a; };
 		struct {  int8 z, y, x, w; };
 	};
+
+	bool operator != (const SCol& other) const { return icolor != other.icolor; }
+	bool operator == (const SCol& other) const { return icolor == other.icolor; }
 
 	//! Get normal vector from signed 8bit integers (can point up/down but is not normal).
 	ILINE Vec3 GetN() const

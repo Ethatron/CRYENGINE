@@ -1145,11 +1145,8 @@ void CTerrainNode::GenerateIndicesForAllSurfaces(IRenderMesh* pRM, bool bOnlyBor
 
 	int nSrcCount = 0;
 	vtx_idx* pSrcInds = NULL;
-	byte* pPosPtr = NULL;
-	int nColorStride = 0;
-	byte* pColor = NULL;
-	int nNormStride = 0;
-	byte* pNormB = NULL;
+	strided_pointer<UCol> pColor = NULL;
+	strided_pointer<SCol> pNormB = NULL;
 
 	bool useMesh = false;
 
@@ -1164,15 +1161,15 @@ void CTerrainNode::GenerateIndicesForAllSurfaces(IRenderMesh* pRM, bool bOnlyBor
 		if (!pSrcInds)
 			return;
 
-		pPosPtr = reinterpret_cast<byte*>(pUpdateTerrainTempData->m_lstTmpVertArray.GetElements());
+		SVF_P2H_C4B_T1F_N4C* pPosPtr = reinterpret_cast<SVF_P2H_C4B_T1F_N4C*>(pUpdateTerrainTempData->m_lstTmpVertArray.GetElements());
 
 		uint32 nColorOffset = offsetof(SVF_P2H_C4B_T1F_N4C, color);
-		nColorStride = sizeof(SVF_P2H_C4B_T1F_N4C);
-		pColor = pPosPtr + nColorOffset;
+		pColor.iStride = sizeof(SVF_P2H_C4B_T1F_N4C);
+		pColor.data = &pPosPtr->color;
 
 		uint32 nNormOffset = offsetof(SVF_P2H_C4B_T1F_N4C, normal);
-		nNormStride = sizeof(SVF_P2H_C4B_T1F_N4C);
-		pNormB = pPosPtr + nNormOffset;
+		pNormB.iStride = sizeof(SVF_P2H_C4B_T1F_N4C);
+		pNormB.data = &pPosPtr->normal;
 	}
 	else
 	{
@@ -1180,15 +1177,14 @@ void CTerrainNode::GenerateIndicesForAllSurfaces(IRenderMesh* pRM, bool bOnlyBor
 
 		// we don't have all data we need, get it from the rendermesh
 		nSrcCount = pRM->GetIndicesCount();
-		if (!nSrcCount)
-			return;
-		pSrcInds = pRM->GetIndexPtr(FSL_READ);
+		pSrcInds = pRM->GetIndices(FSL_READ);
+
 		assert(pSrcInds);
-		if (!pSrcInds)
+		if (!pSrcInds || !nSrcCount)
 			return;
 
-		pColor = pRM->GetColorPtr(nColorStride, FSL_READ);
-		pNormB = pRM->GetNormPtr(nNormStride, FSL_READ);
+		pColor = pRM->GetColors(FSL_READ);
+		pNormB = pRM->GetNormalsI8(FSL_READ);
 
 		if (!pColor || !pNormB)
 		{
@@ -1220,9 +1216,9 @@ void CTerrainNode::GenerateIndicesForAllSurfaces(IRenderMesh* pRM, bool bOnlyBor
 			if (arrTriangle[0] >= (unsigned)nVertCount || arrTriangle[1] >= (unsigned)nVertCount || arrTriangle[2] >= (unsigned)nVertCount)
 				continue;
 
-			UCol& Color0 = *(UCol*)&pColor[arrTriangle[0] * nColorStride];
-			UCol& Color1 = *(UCol*)&pColor[arrTriangle[1] * nColorStride];
-			UCol& Color2 = *(UCol*)&pColor[arrTriangle[2] * nColorStride];
+			const UCol& Color0 = pColor[arrTriangle[0]];
+			const UCol& Color1 = pColor[arrTriangle[1]];
+			const UCol& Color2 = pColor[arrTriangle[2]];
 
 			uint32 nVertSurfId0 = Color0.bcolor[1] & SRangeInfo::e_undefined;
 			uint32 nVertSurfId1 = Color1.bcolor[1] & SRangeInfo::e_undefined;
@@ -1243,22 +1239,19 @@ void CTerrainNode::GenerateIndicesForAllSurfaces(IRenderMesh* pRM, bool bOnlyBor
 			int lstProjIds[3];
 			int idxProjIds(0);
 
-			SCol* pNorm;
 			Vec3 vNorm;
 
 			// if there are 3d materials - analyze normals
 			if (arrMat3DFlag[nVertSurfId0])
 			{
-				pNorm = reinterpret_cast<SCol*>(&pNormB[arrTriangle[0] * nNormStride]);
-				vNorm = pNorm->GetN();
+				vNorm = pNormB[arrTriangle[0]].GetN();
 				int nProjId0 = GetVecProjectId(vNorm);
 				lstProjIds[idxProjIds++] = nProjId0;
 			}
 
 			if (arrMat3DFlag[nVertSurfId1])
 			{
-				pNorm = reinterpret_cast<SCol*>(&pNormB[arrTriangle[1] * nNormStride]);
-				vNorm = pNorm->GetN();
+				vNorm = pNormB[arrTriangle[1]].GetN();
 				int nProjId1 = GetVecProjectId(vNorm);
 				if (idxProjIds == 0 || lstProjIds[0] != nProjId1)
 					lstProjIds[idxProjIds++] = nProjId1;
@@ -1266,8 +1259,7 @@ void CTerrainNode::GenerateIndicesForAllSurfaces(IRenderMesh* pRM, bool bOnlyBor
 
 			if (arrMat3DFlag[nVertSurfId2])
 			{
-				pNorm = reinterpret_cast<SCol*>(&pNormB[arrTriangle[2] * nNormStride]);
-				vNorm = pNorm->GetN();
+				vNorm = pNormB[arrTriangle[2]].GetN();
 				int nProjId2 = GetVecProjectId(vNorm);
 				if ((idxProjIds < 2 || lstProjIds[1] != nProjId2) &&
 				    (idxProjIds < 1 || lstProjIds[0] != nProjId2))
@@ -1350,7 +1342,7 @@ void CTerrainNode::UpdateSurfaceRenderMeshes(const _smart_ptr<IRenderMesh> pSrcR
 			return; // no borders involved
 		}
 
-		vtx_idx* pIndicesOld = pMatRM->GetIndexPtr(FSL_READ);
+		const auto pIndicesOld = pMatRM->GetIndices(FSL_READ);
 
 		int nIndexCountNew = nNonBorderIndicesCount + lstIndices.Count();
 
@@ -1584,11 +1576,10 @@ void CTerrainNode::AppendTrianglesFromObjects(const int nOriginX, const int nOri
 		{
 			pRM->LockForThreadAccess();
 
-			int nPosStride = 0, nTangsStride = 0;
 			int nInds = pRM->GetIndicesCount();
-			const byte* pPos = pRM->GetPosPtr(nPosStride, FSL_READ);
-			vtx_idx* pInds = pRM->GetIndexPtr(FSL_READ);
-			byte* pTangs = pRM->GetTangentPtr(nTangsStride, FSL_READ);
+			const auto pPos = pRM->GetPositions(FSL_READ);
+			const auto pInds = pRM->GetIndices(FSL_READ);
+			const auto pTangs = pRM->GetTangents(FSL_READ);
 
 			if (pInds && pPos && pTangs)
 			{
@@ -1643,9 +1634,9 @@ void CTerrainNode::AppendTrianglesFromObjects(const int nOriginX, const int nOri
 
 							for (int v = 0; v < 3; v++)
 							{
-								vPosWS[v] = m34.TransformPoint((*(Vec3*)&pPos[nPosStride * pInds[i + v]]));
+								vPosWS[v] = m34.TransformPoint(pPos[pInds[i + v]]);
 
-								SPipTangents & basis = *(SPipTangents*)&pTangs[nTangsStride * pInds[i + v]];
+								auto basis = pTangs[pInds[i + v]];
 
 								vNormWS[v] = m34.TransformVector(basis.GetN()).GetNormalized();
 

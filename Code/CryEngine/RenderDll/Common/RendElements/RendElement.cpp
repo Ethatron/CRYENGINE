@@ -235,28 +235,3 @@ void CRenderElement::mfGetPlane(Plane& pl)
 }
 
 bool  CRenderElement::mfDraw(CShader* ef, SShaderPass* sfm)                                                   { return false; }
-void* CRenderElement::mfGetPointer(ESrcPointer ePT, int* Stride, EParamType Type, ESrcPointer Dst, int Flags) { return NULL; }
-
-//=============================================================================
-
-void* SRendItem::mfGetPointerCommon(ESrcPointer ePT, int* Stride, EParamType Type, ESrcPointer Dst, int Flags)
-{
-	int j;
-	switch (ePT)
-	{
-	case eSrcPointer_Vert:
-		*Stride = gRenDev->m_RP.m_StreamStride;
-		return gRenDev->m_RP.m_StreamPtr.PtrB;
-
-	case eSrcPointer_Color:
-		*Stride = gRenDev->m_RP.m_StreamStride;
-		return gRenDev->m_RP.m_StreamPtr.PtrB + gRenDev->m_RP.m_StreamOffsetColor;
-
-	case eSrcPointer_Tex:
-	case eSrcPointer_TexLM:
-		*Stride = gRenDev->m_RP.m_StreamStride;
-		j = ePT - eSrcPointer_Tex;
-		return gRenDev->m_RP.m_StreamPtr.PtrB + gRenDev->m_RP.m_StreamOffsetTC + j * 16;
-	}
-	return NULL;
-}

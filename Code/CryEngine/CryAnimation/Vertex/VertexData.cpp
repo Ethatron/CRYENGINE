@@ -88,19 +88,21 @@ bool CSoftwareMesh::Create(const CMesh& mesh, const DynArray<RChunk>& renderChun
 	}
 
 	const uint32 vertexCount = mesh.GetVertexCount();
+
 	AllocateVertices(vertexCount);
 
 	strided_pointer<Vec3> positions = GetWritePositions();
-	strided_pointer<uint32> colors = GetWriteColors();
-	strided_pointer<Vec2> coords = GetWriteCoords();
-	strided_pointer<Quat> tangents = GetWriteTangents();
+	strided_pointer<UCol> colors    = GetWriteColors();
+	strided_pointer<Vec2> coords    = GetWriteCoords();
+	strided_pointer<Quat> tangents  = GetWriteTangents();
+
 	for (uint i = 0; i < vertexCount; ++i)
 	{
 		positions[i] = mesh.m_pPositions[i] + positionOffset;
 		if (mesh.m_pColors)
-			colors[i] = *(uint32*)&mesh.m_pColors[i];
+			colors[i] = *(UCol*)&mesh.m_pColors[i];
 		else
-			colors[i] = 0xffffffff;
+			colors[i].dcolor = 0xffffffff;
 		coords[i] = mesh.m_pTexCoord[i].GetUV();
 		tangents[i] = mesh.m_pQTangents[i].GetQ();
 		assert(tangents[i].IsUnit());
@@ -184,62 +186,68 @@ bool CSoftwareMesh::Create(IRenderMesh& renderMesh, const DynArray<RChunk>& rend
 	uint indexCount = renderMesh.GetIndicesCount();
 	uint vertexCount = renderMesh.GetVerticesCount();
 
-	vtx_idx* pIndices = renderMesh.GetIndexPtr(FSL_READ);
-
-	int32 positionStride;
-	uint8* pPositions = renderMesh.GetPosPtr(positionStride, FSL_READ);
-	if (pPositions == 0)
-		return false;
-
-	int32 colorStride;
-	uint8* pColors = renderMesh.GetColorPtr(colorStride, FSL_READ);
-	if (pColors == 0)
-		return false;
-
-	int32 coordStride;
-	uint8* pCoords = renderMesh.GetUVPtr(coordStride, FSL_READ);
-	if (pCoords == 0)
-		return false;
-
-	int32 tangentStride;
-	uint8* pTangents = renderMesh.GetQTangentPtr(tangentStride, FSL_READ);
-	if (pTangents == 0)
-		return false;
-
-	int32 indicesWeightsStride;
-	uint8* pIndicesWeights = renderMesh.GetHWSkinPtr(indicesWeightsStride, FSL_READ, 0, false);       //pointer to weights and bone-id
-	if (pIndicesWeights == 0)
-		return false;
+	const auto pIndices        = renderMesh.GetIndices(FSL_READ);
+	const auto pIndicesWeights = renderMesh.GetHWSkinWeights(FSL_READ, false);       //pointer to weights and bone-id
 
 	AllocateVertices(vertexCount);
 
-	const bool texCoordsAre32Bits = renderMesh.GetVertexFormat() == EDefaultInputLayouts::P3F_C4B_T2F;
-	CRY_ASSERT(texCoordsAre32Bits || renderMesh.GetVertexFormat() == EDefaultInputLayouts::P3H_C4B_T2H);
+	const bool bF32 = renderMesh.GetVertexFormat() == EDefaultInputLayouts::P3F_C4B_T2F;
+	const bool bF16 = renderMesh.GetVertexFormat() == EDefaultInputLayouts::P3H_C4B_T2H;
+	CRY_ASSERT(bF32 || bF16);
 
 	strided_pointer<Vec3> positions = GetWritePositions();
-	strided_pointer<uint32> colors = GetWriteColors();
-	strided_pointer<Vec2> coords = GetWriteCoords();
-	strided_pointer<Quat> tangents = GetWriteTangents();
-	for (uint i = 0; i < vertexCount; ++i)
-	{
-		positions[i] = *((const Vec3*)(pPositions + i * positionStride)) + positionOffset;
-		colors[i] = *((const uint32*)(pColors + i * colorStride));
-		if (texCoordsAre32Bits)
-			coords[i] = *((const Vec2*)(pCoords + i * coordStride));
-		else
-			coords[i] = ((const Vec2f16*)(pCoords + i * coordStride))->ToVec2();
+	strided_pointer<UCol> colors    = GetWriteColors();
+	strided_pointer<Vec2> coords    = GetWriteCoords();
+	strided_pointer<Quat> tangents  = GetWriteTangents();
 
-		const SPipQTangents& tangent = *(const SPipQTangents*)(pTangents + i * tangentStride);
-		tangents[i] = SPipQTangents(tangent).GetQ();
-		assert(tangents[i].IsUnit());
+	if (bF32)
+	{
+		const auto pPositions = renderMesh.GetPositions(FSL_READ);
+		const auto pColors    = renderMesh.GetColors   (FSL_READ);
+		const auto pCoords    = renderMesh.GetTexCoords(FSL_READ);
+		const auto pTangents  = renderMesh.GetQTangents(FSL_READ);
+
+		if (pPositions == 0 || pColors == 0 || pCoords == 0 || pTangents == 0 || pIndicesWeights == 0)
+			return false;
+
+		for (uint i = 0; i < vertexCount; ++i)
+		{
+			positions[i] = pPositions[i] + positionOffset;
+			colors   [i] = pColors   [i];
+			coords   [i] = pCoords   [i];
+			tangents [i] = pTangents [i].GetQ();
+
+			assert(tangents[i].IsUnit());
+		}
+	}
+	
+	if (bF16)
+	{
+		const auto pPositions = renderMesh.GetPositionsF16(FSL_READ);
+		const auto pColors    = renderMesh.GetColors      (FSL_READ);
+		const auto pCoords    = renderMesh.GetTexCoordsF16(FSL_READ);
+		const auto pTangents  = renderMesh.GetQTangents   (FSL_READ);
+
+		if (pPositions == 0 || pColors == 0 || pCoords == 0 || pTangents == 0 || pIndicesWeights == 0)
+			return false;
+
+		for (uint i = 0; i < vertexCount; ++i)
+		{
+			positions[i] = pPositions[i].ToVec3() + positionOffset;
+			colors   [i] = pColors   [i];
+			coords   [i] = pCoords   [i].ToVec2();
+			tangents [i] = pTangents [i].GetQ();
+
+			assert(tangents[i].IsUnit());
+		}
 	}
 
-	strided_pointer<SoftwareVertexBlendIndex> blendIndices = GetWriteBlendIndices();
+	strided_pointer<SoftwareVertexBlendIndex>  blendIndices = GetWriteBlendIndices();
 	strided_pointer<SoftwareVertexBlendWeight> blendWeights = GetWriteBlendWeights();
 	const uint blendCount = 4;
 	for (uint i = 0; i < vertexCount; ++i)
 	{
-		SoftwareVertexBlendIndex* pBlendIndices = &blendIndices[i];
+		SoftwareVertexBlendIndex*  pBlendIndices = &blendIndices[i];
 		SoftwareVertexBlendWeight* pBlendWeights = &blendWeights[i];
 
 		for (uint j = 0; j < blendCount; ++j)
@@ -248,9 +256,9 @@ bool CSoftwareMesh::Create(IRenderMesh& renderMesh, const DynArray<RChunk>& rend
 			pBlendWeights[j] = 0;
 		}
 
-		const ColorB& weights = *(const ColorB*)&((const SVF_W4B_I4U*)(pIndicesWeights + i * indicesWeightsStride))->weights;
+		const UCol& weights = pIndicesWeights[i].weights;
 		for (uint j = 0; j < 4; ++j)
-			pBlendWeights[j] = weights[j];
+			pBlendWeights[j] = weights.bcolor[j];
 	}
 
 	uint subsetCount = uint(renderChunks.size());
@@ -261,13 +269,13 @@ bool CSoftwareMesh::Create(IRenderMesh& renderMesh, const DynArray<RChunk>& rend
 		for (uint32 j = startIndex; j < endIndex; ++j)
 		{
 			const uint32 index = pIndices[j];
-			const uint16* subsetBlendIndices = ((const SVF_W4B_I4U*)(pIndicesWeights + index * indicesWeightsStride))->indices;
-			const ColorB& subsetWeightIndices = *(const ColorB*)&((const SVF_W4B_I4U*)(pIndicesWeights + index * indicesWeightsStride))->weights;
+			const uint16* subsetBlendIndices = pIndicesWeights[index].indices;
+			const UCol& subsetWeightIndices = pIndicesWeights[index].weights;
 
 			SoftwareVertexBlendIndex* pBlendIndices = &blendIndices[index];
 			for (uint k = 0; k < 4; ++k)
 			{
-				if (subsetWeightIndices[k])
+				if (subsetWeightIndices.bcolor[k])
 					pBlendIndices[k] = subsetBlendIndices[k];
 			}
 		}

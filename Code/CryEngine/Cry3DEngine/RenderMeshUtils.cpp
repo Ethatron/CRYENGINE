@@ -33,23 +33,38 @@ bool SIntersectionData::Init(IRenderMesh* param_pRenderMesh, SRayHitInfo* param_
 
 	bool bAllDMeshData = pHitInfo->bGetVertColorAndTC;
 
-	nVerts = pRenderMesh->GetVerticesCount();
-	nInds = pRenderMesh->GetIndicesCount();
+	nVertices = pRenderMesh->GetVerticesCount();
+	nIndices = pRenderMesh->GetIndicesCount();
 
-	if (nInds == 0 || nVerts == 0)
+	if (!nIndices || !nVertices)
 		return false;
-	pPos = (uint8*)pRenderMesh->GetPosPtr(nPosStride, FSL_READ);
-	pInds = pRenderMesh->GetIndexPtr(FSL_READ);
 
-	if (!pPos || !pInds)
+	const auto vtx_fmt = pRenderMesh->GetVertexFormat();
+
+	{
+		const bool bF32 = vtx_fmt == EDefaultInputLayouts::P3F_C4B_T2F || vtx_fmt == EDefaultInputLayouts::P3F || vtx_fmt == EDefaultInputLayouts::P3F_C4B_T2H;
+		const bool bF16 = vtx_fmt == EDefaultInputLayouts::P3H_C4B_T2H || vtx_fmt == EDefaultInputLayouts::P3H;
+
+		pPositionsF32 = bF32 ? pRenderMesh->GetPositions  (FSL_READ) : nullptr;
+		pPositionsF16 = bF16 ? pRenderMesh->GetPositionsF16(FSL_READ) : nullptr;
+
+		pIndices = pRenderMesh->GetIndices(FSL_READ);
+	}
+
+
+	if ((!pPositionsF32 && !pPositionsF16) || !pIndices)
 		return false;
 
 	if (bAllDMeshData)
 	{
-		pUV = (uint8*)pRenderMesh->GetUVPtr(nUVStride, FSL_READ);
-		pCol = (uint8*)pRenderMesh->GetColorPtr(nColStride, FSL_READ);
+		const bool bF32 = vtx_fmt == EDefaultInputLayouts::P3F_C4B_T2F || vtx_fmt == EDefaultInputLayouts::P3F;
+		const bool bF16 = vtx_fmt == EDefaultInputLayouts::P3H_C4B_T2H || vtx_fmt == EDefaultInputLayouts::P3H || vtx_fmt == EDefaultInputLayouts::P3F_C4B_T2H;
 
-		pTangs = pRenderMesh->GetTangentPtr(nTangsStride, FSL_READ);
+		pTexCoordsF32 = bF32 ? pRenderMesh->GetTexCoords   (FSL_READ) : nullptr;
+		pTexCoordsF16 = bF16 ? pRenderMesh->GetTexCoordsF16(FSL_READ) : nullptr;
+
+		pColours  = pRenderMesh->GetColors(FSL_READ);
+		pTangents = pRenderMesh->GetTangents(FSL_READ);
 	}
 
 	return true;
@@ -235,19 +250,19 @@ bool CRenderMeshUtils::RayIntersectionImpl(SIntersectionData* pIntersectionRMDat
 		}
 	}
 
-	uint nVerts = rIntersectionRMData.nVerts;
-	int nInds = rIntersectionRMData.nInds;
+	uint nVerts = rIntersectionRMData.nVertices;
+	int nInds = rIntersectionRMData.nIndices;
 
 	assert(nInds != 0 && nVerts != 0);
 
 	// get position offset and stride
-	const int nPosStride = rIntersectionRMData.nPosStride;
-	uint8* const pPos = rIntersectionRMData.pPos;
+	const auto pPos32 = rIntersectionRMData.pPositionsF32;
+	const auto pPos16 = rIntersectionRMData.pPositionsF16;
 
 	// get indices
-	vtx_idx* const pInds = rIntersectionRMData.pInds;
+	const auto pInds = rIntersectionRMData.pIndices;
 
-	assert(pInds != NULL && pPos != NULL);
+	assert(pInds != NULL && (pPos32 != NULL || pPos16 != NULL));
 	assert(nInds % 3 == 0);
 
 	float fMinDistance2 = FLT_MAX;
@@ -287,7 +302,7 @@ bool CRenderMeshUtils::RayIntersectionImpl(SIntersectionData* pIntersectionRMDat
 		}
 
 		int nLastIndexId = pChunk->nFirstIndexId + pChunk->nNumIndices;
-		const vtx_idx* __restrict pIndices = rIntersectionRMData.pInds;
+		const vtx_idx* __restrict pIndices = rIntersectionRMData.pIndices;
 
 		IF (nLastIndexId - 1 >= nInds, 0)
 		{
@@ -313,9 +328,23 @@ bool CRenderMeshUtils::RayIntersectionImpl(SIntersectionData* pIntersectionRMDat
 				}
 
 				// get tri vertices
-				const Vec3& tv0 = *(const Vec3*)&pPos[nPosStride * pIndices[i + 0]];
-				const Vec3& tv1 = *(const Vec3*)&pPos[nPosStride * pIndices[i + 1]];
-				const Vec3& tv2 = *(const Vec3*)&pPos[nPosStride * pIndices[i + 2]];
+				Vec3 tv0;
+				Vec3 tv1;
+				Vec3 tv2;
+
+				if (pPos32)
+				{
+					tv0 = pPos32[pIndices[i + 0]];
+					tv1 = pPos32[pIndices[i + 1]];
+					tv2 = pPos32[pIndices[i + 2]];
+				}
+
+				if (pPos16)
+				{
+					tv0 = pPos16[pIndices[i + 0]].ToVec3();
+					tv1 = pPos16[pIndices[i + 1]].ToVec3();
+					tv2 = pPos16[pIndices[i + 2]].ToVec3();
+				}
 
 				if (Intersect::Ray_Triangle(inRay, tv0, tv2, tv1, vOut))
 				{
@@ -447,26 +476,22 @@ bool CRenderMeshUtils::RayIntersectionFastImpl(SIntersectionData& rIntersectionR
 	Vec3 vHitPos(0, 0, 0);
 	Vec3 vHitNormal(0, 0, 0);
 
-	int nVerts = rIntersectionRMData.nVerts;
-	int nInds = rIntersectionRMData.nInds;
+	int nVerts = rIntersectionRMData.nVertices;
+	int nInds = rIntersectionRMData.nIndices;
 
 	assert(nInds != 0 && nVerts != 0);
 
 	// get position offset and stride
-	int nPosStride = rIntersectionRMData.nPosStride;
-	uint8* pPos = rIntersectionRMData.pPos;
-
-	int nUVStride = rIntersectionRMData.nUVStride;
-	uint8* pUV = rIntersectionRMData.pUV;
-
-	int nColStride = rIntersectionRMData.nColStride;
-	uint8* pCol = rIntersectionRMData.pCol;
+	const auto pPos32 = rIntersectionRMData.pPositionsF32;
+	const auto pPos16 = rIntersectionRMData.pPositionsF16;
+	const auto pUV32 = rIntersectionRMData.pTexCoordsF32;
+	const auto pUV16 = rIntersectionRMData.pTexCoordsF16;
+	const auto pCol = rIntersectionRMData.pColours;
 
 	// get indices
-	vtx_idx* pInds = rIntersectionRMData.pInds;
+	const auto pIndices = rIntersectionRMData.pIndices;
 
-	assert(pInds != NULL && pPos != NULL);
-
+	assert(pIndices != NULL && (pPos32 != NULL || pPos16 != NULL));
 	assert(nInds % 3 == 0);
 
 	Ray inRay = hitInfo.inRay;
@@ -485,16 +510,30 @@ bool CRenderMeshUtils::RayIntersectionFastImpl(SIntersectionData& rIntersectionR
 		if (hitInfo.nHitTriID + 2 >= nInds)
 			return false;
 
-		int I0 = pInds[hitInfo.nHitTriID + 0];
-		int I1 = pInds[hitInfo.nHitTriID + 1];
-		int I2 = pInds[hitInfo.nHitTriID + 2];
+		int I0 = pIndices[hitInfo.nHitTriID + 0];
+		int I1 = pIndices[hitInfo.nHitTriID + 1];
+		int I2 = pIndices[hitInfo.nHitTriID + 2];
 
 		if (I0 < nVerts && I1 < nVerts && I2 < nVerts)
 		{
 			// get tri vertices
-			Vec3& tv0 = *((Vec3*)&pPos[nPosStride * I0]);
-			Vec3& tv1 = *((Vec3*)&pPos[nPosStride * I1]);
-			Vec3& tv2 = *((Vec3*)&pPos[nPosStride * I2]);
+			Vec3 tv0;
+			Vec3 tv1;
+			Vec3 tv2;
+
+			if (pPos32)
+			{
+				tv0 = pPos32[I0];
+				tv1 = pPos32[I1];
+				tv2 = pPos32[I2];
+			}
+
+			if (pPos16)
+			{
+				tv0 = pPos16[I0].ToVec3();
+				tv1 = pPos16[I1].ToVec3();
+				tv2 = pPos16[I2].ToVec3();
+			}
 
 			if (Intersect::Line_Triangle(inLine, tv0, tv2, tv1, vOut))  // || Intersect::Line_Triangle( inLine, tv0, tv1, tv2, vOut ))
 			{
@@ -517,7 +556,7 @@ bool CRenderMeshUtils::RayIntersectionFastImpl(SIntersectionData& rIntersectionR
 	{
 		if (inRay.direction.IsZero())
 		{
-			ProcessBoxIntersection(inRay, hitInfo, rIntersectionRMData, pMtl, pInds, nVerts, pPos, nPosStride, pUV, nUVStride, pCol, nColStride, nInds, bAnyHit, fBestDist, vHitPos, tri);
+			ProcessBoxIntersection(inRay, hitInfo, rIntersectionRMData, pMtl, pIndices, nVerts, pPos32, pUV32, pPos16, pUV16, pCol, nInds, bAnyHit, fBestDist, vHitPos, tri);
 		}
 		else
 		{
@@ -530,17 +569,31 @@ bool CRenderMeshUtils::RayIntersectionFastImpl(SIntersectionData& rIntersectionR
 					if (t.first + 2 >= nInds)
 						return false;
 
-					int I0 = pInds[t.first + 0];
-					int I1 = pInds[t.first + 1];
-					int I2 = pInds[t.first + 2];
+					int I0 = pIndices[t.first + 0];
+					int I1 = pIndices[t.first + 1];
+					int I2 = pIndices[t.first + 2];
 
 					if (I0 >= nVerts || I1 >= nVerts || I2 >= nVerts)
 						return false;
 
 					// get tri vertices
-					Vec3& tv0 = *((Vec3*)&pPos[nPosStride * I0]);
-					Vec3& tv1 = *((Vec3*)&pPos[nPosStride * I1]);
-					Vec3& tv2 = *((Vec3*)&pPos[nPosStride * I2]);
+					Vec3 tv0;
+					Vec3 tv1;
+					Vec3 tv2;
+
+					if (pPos32)
+					{
+						tv0 = pPos32[I0];
+						tv1 = pPos32[I1];
+						tv2 = pPos32[I2];
+					}
+
+					if (pPos16)
+					{
+						tv0 = pPos16[I0].ToVec3();
+						tv1 = pPos16[I1].ToVec3();
+						tv2 = pPos16[I2].ToVec3();
+					}
 
 					if (Intersect::Line_Triangle(inLine, tv0, tv2, tv1, vOut))  // || Intersect::Line_Triangle( inLine, tv0, tv1, tv2, vOut ))
 					{
@@ -582,14 +635,28 @@ bool CRenderMeshUtils::RayIntersectionFastImpl(SIntersectionData& rIntersectionR
 
 		if (hitInfo.bGetVertColorAndTC && hitInfo.nHitTriID >= 0 && !inRay.direction.IsZero())
 		{
-			int I0 = pInds[hitInfo.nHitTriID + 0];
-			int I1 = pInds[hitInfo.nHitTriID + 1];
-			int I2 = pInds[hitInfo.nHitTriID + 2];
+			int I0 = pIndices[hitInfo.nHitTriID + 0];
+			int I1 = pIndices[hitInfo.nHitTriID + 1];
+			int I2 = pIndices[hitInfo.nHitTriID + 2];
 
 			// get tri vertices
-			Vec3& tv0 = *((Vec3*)&pPos[nPosStride * I0]);
-			Vec3& tv1 = *((Vec3*)&pPos[nPosStride * I1]);
-			Vec3& tv2 = *((Vec3*)&pPos[nPosStride * I2]);
+			Vec3 tv0;
+			Vec3 tv1;
+			Vec3 tv2;
+
+			if (pPos32)
+			{
+				tv0 = pPos32[I0];
+				tv1 = pPos32[I1];
+				tv2 = pPos32[I2];
+			}
+
+			if (pPos16)
+			{
+				tv0 = pPos16[I0].ToVec3();
+				tv1 = pPos16[I1].ToVec3();
+				tv2 = pPos16[I2].ToVec3();
+			}
 
 			float u = 0, v = 0, w = 0;
 			if (GetBarycentricCoordinates(vHitPos - tv0, tv1 - tv0, tv2 - tv0, u, v, w, 16.0f))
@@ -600,33 +667,45 @@ bool CRenderMeshUtils::RayIntersectionFastImpl(SIntersectionData& rIntersectionR
 				arrVertWeight[1] *= fDiv;
 				arrVertWeight[2] *= fDiv;
 
-				Vec2 tc0 = ((Vec2f16*)&pUV[nUVStride * I0])->ToVec2();
-				Vec2 tc1 = ((Vec2f16*)&pUV[nUVStride * I1])->ToVec2();
-				Vec2 tc2 = ((Vec2f16*)&pUV[nUVStride * I2])->ToVec2();
+				Vec2 tc0;
+				Vec2 tc1;
+				Vec2 tc2;
+
+				if (pPos32)
+				{
+					tv0 = pUV32[I0];
+					tv1 = pUV32[I1];
+					tv2 = pUV32[I2];
+				}
+
+				if (pPos16)
+				{
+					tv0 = pUV16[I0].ToVec2();
+					tv1 = pUV16[I1].ToVec2();
+					tv2 = pUV16[I2].ToVec2();
+				}
 
 				hitInfo.vHitTC = tc0 * arrVertWeight[0] + tc1 * arrVertWeight[1] + tc2 * arrVertWeight[2];
 
-				Vec4 c0 = (*(ColorB*)&pCol[nColStride * I0]).toVec4();
-				Vec4 c1 = (*(ColorB*)&pCol[nColStride * I1]).toVec4();
-				Vec4 c2 = (*(ColorB*)&pCol[nColStride * I2]).toVec4();
+				const Vec4 c0 = pCol[I0].GetV();
+				const Vec4 c1 = pCol[I1].GetV();
+				const Vec4 c2 = pCol[I2].GetV();
 
 				// get tangent basis
-				int nTangsStride = rIntersectionRMData.nTangsStride;
-				byte* pTangs = rIntersectionRMData.pTangs;
+				const auto pTangs = rIntersectionRMData.pTangents;
 
 				Vec4 tangent[3];
 				Vec4 bitangent[3];
 				int arrId[3] = { I0, I1, I2 };
 				for (int ii = 0; ii < 3; ii++)
 				{
-					SPipTangents tb = *(SPipTangents*)&pTangs[nTangsStride * arrId[ii]];
-
+					SPipTangents tb = pTangs[arrId[ii]];
 					tb.GetTB(tangent[ii], bitangent[ii]);
 				}
 
 				hitInfo.vHitTangent = (tangent[0] * arrVertWeight[0] + tangent[1] * arrVertWeight[1] + tangent[2] * arrVertWeight[2]);
 				hitInfo.vHitBitangent = (bitangent[0] * arrVertWeight[0] + bitangent[1] * arrVertWeight[1] + bitangent[2] * arrVertWeight[2]);
-				hitInfo.vHitColor = (c0 * arrVertWeight[0] + c1 * arrVertWeight[1] + c2 * arrVertWeight[2]) / 255.f;
+				hitInfo.vHitColor = (c0 * arrVertWeight[0] + c1 * arrVertWeight[1] + c2 * arrVertWeight[2]);
 			}
 		}
 	}
@@ -638,7 +717,9 @@ bool CRenderMeshUtils::RayIntersectionFastImpl(SIntersectionData& rIntersectionR
 }
 
 // used for CPU voxelization
-bool CRenderMeshUtils::ProcessBoxIntersection(Ray& inRay, SRayHitInfo& hitInfo, SIntersectionData& rIntersectionRMData, IMaterial* pMtl, vtx_idx* pInds, int nVerts, uint8* pPos, int nPosStride, uint8* pUV, int nUVStride, uint8* pCol, int nColStride, int nInds, bool& bAnyHit, float& fBestDist, Vec3& vHitPos, Vec3* tri)
+bool CRenderMeshUtils::ProcessBoxIntersection(Ray& inRay, SRayHitInfo& hitInfo, SIntersectionData& rIntersectionRMData, IMaterial* pMtl,
+	vtx_idx* pInds, int nVerts, strided_pointer<Vec3> pPos32, strided_pointer<Vec2> pUV32, strided_pointer<Vec3f16> pPos16, strided_pointer<Vec2f16> pUV16, strided_pointer<UCol> pCol,
+	int nInds, bool& bAnyHit, float& fBestDist, Vec3& vHitPos, Vec3* tri)
 {
 	AABB voxBox;
 	voxBox.min = inRay.origin - Vec3(hitInfo.fMaxHitDistance);
@@ -691,9 +772,23 @@ bool CRenderMeshUtils::ProcessBoxIntersection(Ray& inRay, SRayHitInfo& hitInfo, 
 					return false;
 
 				// get tri vertices
-				Vec3& tv0 = *((Vec3*)&pPos[nPosStride * I0]);
-				Vec3& tv1 = *((Vec3*)&pPos[nPosStride * I1]);
-				Vec3& tv2 = *((Vec3*)&pPos[nPosStride * I2]);
+				Vec3 tv0;
+				Vec3 tv1;
+				Vec3 tv2;
+
+				if (pPos32)
+				{
+					tv0 = pPos32[I0];
+					tv1 = pPos32[I1];
+					tv2 = pPos32[I2];
+				}
+
+				if (pPos16)
+				{
+					tv0 = pPos16[I0].ToVec3();
+					tv1 = pPos16[I1].ToVec3();
+					tv2 = pPos16[I2].ToVec3();
+				}
 
 				if (Overlap::AABB_Triangle(voxBox, tv0, tv2, tv1))
 				{
@@ -708,16 +803,26 @@ bool CRenderMeshUtils::ProcessBoxIntersection(Ray& inRay, SRayHitInfo& hitInfo, 
 						ht.v[1] = tv1;
 						ht.v[2] = tv2;
 
-						ht.t[0] = *((Vec2*)&pUV[nUVStride * I0]);
-						ht.t[1] = *((Vec2*)&pUV[nUVStride * I1]);
-						ht.t[2] = *((Vec2*)&pUV[nUVStride * I2]);
+						if (pPos32)
+						{
+							ht.t[0] = pUV32[I0];
+							ht.t[1] = pUV32[I1];
+							ht.t[2] = pUV32[I2];
+						}
+
+						if (pPos16)
+						{
+							ht.t[0] = pUV16[I0].ToVec2();
+							ht.t[1] = pUV16[I1].ToVec2();
+							ht.t[2] = pUV16[I2].ToVec2();
+						}
 
 						ht.pMat = pMtl->GetSafeSubMtl(nChunkMatID);
 						pMtl->AddRef();
 
-						ht.c[0] = (*(ColorB*)&pCol[nColStride * I0]);
-						ht.c[1] = (*(ColorB*)&pCol[nColStride * I1]);
-						ht.c[2] = (*(ColorB*)&pCol[nColStride * I2]);
+						ht.c[0] = pCol[I0].dcolor;
+						ht.c[1] = pCol[I1].dcolor;
+						ht.c[2] = pCol[I2].dcolor;
 
 						ht.nOpacity = SATURATEB(int(fOpacity * 255.f));
 						hitInfo.pHitTris->Add(ht);
@@ -743,9 +848,23 @@ bool CRenderMeshUtils::ProcessBoxIntersection(Ray& inRay, SRayHitInfo& hitInfo, 
 				return false;
 
 			// get tri vertices
-			Vec3& tv0 = *((Vec3*)&pPos[nPosStride * I0]);
-			Vec3& tv1 = *((Vec3*)&pPos[nPosStride * I1]);
-			Vec3& tv2 = *((Vec3*)&pPos[nPosStride * I2]);
+			Vec3 tv0;
+			Vec3 tv1;
+			Vec3 tv2;
+
+			if (pPos32)
+			{
+				tv0 = pPos32[I0];
+				tv1 = pPos32[I1];
+				tv2 = pPos32[I2];
+			}
+
+			if (pPos16)
+			{
+				tv0 = pPos16[I0].ToVec3();
+				tv1 = pPos16[I1].ToVec3();
+				tv2 = pPos16[I2].ToVec3();
+			}
 
 			if (Overlap::AABB_Triangle(voxBox, tv0, tv2, tv1))
 			{

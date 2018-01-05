@@ -5444,12 +5444,16 @@ bool CD3D9Renderer::RayIntersectMesh(IRenderMesh* pMesh, const Ray& ray, Vec3& h
 	const int numVertices = pMesh->GetVerticesCount();
 	if (numIndices || numVertices)
 	{
+		const auto vtx_fmt = pMesh->GetVertexFormat();
+		const bool bF32 = vtx_fmt == EDefaultInputLayouts::P3F_C4B_T2F || vtx_fmt == EDefaultInputLayouts::P3F;
+		const bool bF16 = vtx_fmt == EDefaultInputLayouts::P3H_C4B_T2H || vtx_fmt == EDefaultInputLayouts::P3H;
+
 		// TODO: this could be optimized, e.g cache triangles and uv's and use octree to find triangles
-		strided_pointer<Vec3> pPos;
-		strided_pointer<Vec2> pUV;
-		pPos.data = (Vec3*)pMesh->GetPosPtr(pPos.iStride, FSL_READ);
-		pUV.data = (Vec2*)pMesh->GetUVPtr(pUV.iStride, FSL_READ);
-		const vtx_idx* pIndices = pMesh->GetIndexPtr(FSL_READ);
+		const auto pPos     = bF32 ? pMesh->GetPositions   (FSL_READ) : nullptr;
+		const auto pUV      = bF32 ? pMesh->GetTexCoords   (FSL_READ) : nullptr;
+		const auto pPos16   = bF16 ? pMesh->GetPositionsF16(FSL_READ) : nullptr;
+		const auto pUV16    = bF16 ? pMesh->GetTexCoordsF16(FSL_READ) : nullptr;
+		const auto pIndices =        pMesh->GetIndices     (FSL_READ);
 
 		const TRenderChunkArray& Chunks = pMesh->GetChunks();
 		const int nChunkCount = Chunks.size();
@@ -5459,26 +5463,49 @@ bool CD3D9Renderer::RayIntersectMesh(IRenderMesh* pMesh, const Ray& ray, Vec3& h
 			if ((pChunk->m_nMatFlags & MTL_FLAG_NODRAW))
 				continue;
 
-			int lastIndex = pChunk->nFirstIndexId + pChunk->nNumIndices;
-			for (int i = pChunk->nFirstIndexId; i < lastIndex; i += 3)
-			{
-				const Vec3& v0 = pPos[pIndices[i]];
-				const Vec3& v1 = pPos[pIndices[i + 1]];
-				const Vec3& v2 = pPos[pIndices[i + 2]];
+			const int lastIndex = pChunk->nFirstIndexId + pChunk->nNumIndices;
 
-				if (Intersect::Ray_Triangle(ray, v0, v2, v1, hitpos))  // only front face
+			if (bF32)
+				for (int i = pChunk->nFirstIndexId; i < lastIndex; i += 3)
 				{
-					uv0 = pUV[pIndices[i]];
-					uv1 = pUV[pIndices[i + 1]];
-					uv2 = pUV[pIndices[i + 2]];
-					p0 = v0;
-					p1 = v1;
-					p2 = v2;
-					hasHit = true;
-					nChunkId = nChunkCount; // break outer loop
-					break;
+					const Vec3& v0 = pPos[pIndices[i + 0]];
+					const Vec3& v1 = pPos[pIndices[i + 1]];
+					const Vec3& v2 = pPos[pIndices[i + 2]];
+
+					if (Intersect::Ray_Triangle(ray, v0, v2, v1, hitpos))  // only front face
+					{
+						uv0 = pUV[pIndices[i + 0]];
+						uv1 = pUV[pIndices[i + 1]];
+						uv2 = pUV[pIndices[i + 2]];
+						p0 = v0;
+						p1 = v1;
+						p2 = v2;
+						hasHit = true;
+						nChunkId = nChunkCount; // break outer loop
+						break;
+					}
 				}
-			}
+
+			if (bF16)
+				for (int i = pChunk->nFirstIndexId; i < lastIndex; i += 3)
+				{
+					const Vec3 v0 = pPos16[pIndices[i + 0]].ToVec3();
+					const Vec3 v1 = pPos16[pIndices[i + 1]].ToVec3();
+					const Vec3 v2 = pPos16[pIndices[i + 2]].ToVec3();
+
+					if (Intersect::Ray_Triangle(ray, v0, v2, v1, hitpos))  // only front face
+					{
+						uv0 = pUV16[pIndices[i + 0]].ToVec2();
+						uv1 = pUV16[pIndices[i + 1]].ToVec2();
+						uv2 = pUV16[pIndices[i + 2]].ToVec2();
+						p0 = v0;
+						p1 = v1;
+						p2 = v2;
+						hasHit = true;
+						nChunkId = nChunkCount; // break outer loop
+						break;
+					}
+				}
 		}
 	}
 

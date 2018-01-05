@@ -99,8 +99,6 @@ struct SRendItem
 	//uint32 nStencRef  : 8;
 
 	//==================================================
-	static void*       mfGetPointerCommon(ESrcPointer ePT, int* Stride, EParamType Type, ESrcPointer Dst, int Flags);
-
 	static inline void mfGet(uint32 nVal, int& nTechnique, CShader*& Shader, CShaderResources*& Res)
 	{
 		Shader = (CShader*)CShaderMan::s_pContainer->m_RList[CBaseResource::RListIndexFromId((nVal >> 20) & (MAX_REND_SHADERS - 1))];

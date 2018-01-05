@@ -686,60 +686,6 @@ public:
 		config.SetCategory(EFLN_ADVANCED);
 	}
 
-	bool RayIntersectMesh(IRenderMesh* pMesh, IMaterial* pMaterial, IUIElement* pElement, const Ray& ray, Vec3& hitpos, Vec3& p0, Vec3& p1, Vec3& p2, Vec2& uv0, Vec2& uv1, Vec2& uv2)
-	{
-		bool hasHit = false;
-		// get triangle that was hit
-		pMesh->LockForThreadAccess();
-		const int numIndices = pMesh->GetIndicesCount();
-		const int numVertices = pMesh->GetVerticesCount();
-		if (numIndices || numVertices)
-		{
-			// TODO: this could be optimized, e.g cache triangles and uv's and use octree to find triangles
-			strided_pointer<Vec3> pPos;
-			strided_pointer<Vec2> pUV;
-			pPos.data = (Vec3*)pMesh->GetPosPtr(pPos.iStride, FSL_READ);
-			pUV.data = (Vec2*)pMesh->GetUVPtr(pUV.iStride, FSL_READ);
-			const vtx_idx* pIndices = pMesh->GetIndexPtr(FSL_READ);
-
-			const TRenderChunkArray& Chunks = pMesh->GetChunks();
-			const int nChunkCount = Chunks.size();
-			for (int nChunkId = 0; nChunkId < nChunkCount; nChunkId++)
-			{
-				const CRenderChunk* pChunk = &Chunks[nChunkId];
-				if ((pChunk->m_nMatFlags & MTL_FLAG_NODRAW))
-					continue;
-
-				int lastIndex = pChunk->nFirstIndexId + pChunk->nNumIndices;
-				for (int i = pChunk->nFirstIndexId; i < lastIndex; i += 3)
-				{
-					const Vec3& v0 = pPos[pIndices[i]];
-					const Vec3& v1 = pPos[pIndices[i + 1]];
-					const Vec3& v2 = pPos[pIndices[i + 2]];
-
-					if (Intersect::Ray_Triangle(ray, v0, v2, v1, hitpos))  // only front face
-					{
-						uv0 = pUV[pIndices[i]];
-						uv1 = pUV[pIndices[i + 1]];
-						uv2 = pUV[pIndices[i + 2]];
-						p0 = v0;
-						p1 = v1;
-						p2 = v2;
-						hasHit = true;
-						nChunkId = nChunkCount; // break outer loop
-						break;
-					}
-				}
-			}
-		}
-
-		pMesh->UnlockStream(VSF_GENERAL);
-		pMesh->UnlockIndexStream();
-		pMesh->UnLockForThreadAccess();
-
-		return hasHit;
-	}
-
 	virtual void ProcessEvent(EFlowEvent event, SActivationInfo* pActInfo)
 	{
 		switch (event)
@@ -778,7 +724,7 @@ public:
 						IEntityRender* pIEntityRender = pEntity ? pEntity->GetRenderInterface() : 0;
 
 						// Get the renderproxy, and use it to check if the material is a DynTex, and get the UIElement if so
-						
+
 						{
 							IRenderNode* pRenderNode = pIEntityRender->GetRenderNode();
 							IMaterial* pMaterial = pIEntityRender->GetRenderMaterial();
@@ -789,89 +735,21 @@ public:
 
 							if (pElement && pRenderNode)
 							{
-								int m_dynTexGeomSlot = 0;
-								IStatObj* pObj = pRenderNode->GetEntityStatObj(m_dynTexGeomSlot);
-
-								// result
-								bool hasHit = false;
-								Vec2 uv0, uv1, uv2;
-								Vec3 p0, p1, p2;
-								Vec3 hitpos;
-
-								// calculate ray dir
-								CCamera cam = gEnv->pRenderer->GetCamera();
-								if (pEntity->GetSlotFlags(m_dynTexGeomSlot) & ENTITY_SLOT_RENDER_NEAREST)
-								{
-									ICVar* r_drawnearfov = gEnv->pConsole->GetCVar("r_DrawNearFoV");
-									assert(r_drawnearfov);
-									cam.SetFrustum(cam.GetViewSurfaceX(), cam.GetViewSurfaceZ(), DEG2RAD(r_drawnearfov->GetFVal()), cam.GetNearPlane(), cam.GetFarPlane(), cam.GetPixelAspectRatio());
-								}
-
-								Vec3 vPos0 = rayPos;
-								Vec3 vPos1 = rayPos + rayDir;
-
-								// translate into object space
-								const Matrix34 m = pEntity->GetWorldTM().GetInverted();
-								vPos0 = m * vPos0;
-								vPos1 = m * vPos1;
-
-								// walk through all sub objects
-								const int objCount = pObj->GetSubObjectCount();
-								for (int obj = 0; obj <= objCount && !hasHit; ++obj)
-								{
-									Vec3 vP0, vP1;
-									IStatObj* pSubObj = NULL;
-
-									if (obj == objCount)
-									{
-										vP0 = vPos0;
-										vP1 = vPos1;
-										pSubObj = pObj;
-									}
-									else
-									{
-										IStatObj::SSubObject* pSub = pObj->GetSubObject(obj);
-										const Matrix34 mm = pSub->tm.GetInverted();
-										vP0 = mm * vPos0;
-										vP1 = mm * vPos1;
-										pSubObj = pSub->pStatObj;
-									}
-
-									IRenderMesh* pMesh = pSubObj ? pSubObj->GetRenderMesh() : NULL;
-									if (pMesh)
-									{
-										const Ray ray(vP0, (vP1 - vP0).GetNormalized() * maxRayDist);
-										hasHit = RayIntersectMesh(pMesh, pMaterial, pElement, ray, hitpos, p0, p1, p2, uv0, uv1, uv2);
-									}
-								}
+								float UOut, VOut;
 
 								// skip if not hit
-								if (!hasHit)
+								if (gEnv->pRenderer->GetDetailedRayHitInfo(rayHit.pCollider, rayPos, rayDir, maxRayDist, &UOut, &VOut) == -1)
 								{
 									ActivateOutput(pActInfo, EOP_Failed, 1);
 									return;
 								}
 
-								// calculate vectors from hitpos to vertices p0, p1 and p2:
-								const Vec3 v0 = p0 - hitpos;
-								const Vec3 v1 = p1 - hitpos;
-								const Vec3 v2 = p2 - hitpos;
-
-								// calculate factors
-								const float h = (p0 - p1).Cross(p0 - p2).GetLength();
-								const float f0 = v1.Cross(v2).GetLength() / h;
-								const float f1 = v2.Cross(v0).GetLength() / h;
-								const float f2 = v0.Cross(v1).GetLength() / h;
-
-								// find the uv corresponding to hitpos
-								Vec3 uv = uv0 * f0 + uv1 * f1 + uv2 * f2;
-
 								// translate to flash space
 								int x, y, width, height;
 								float aspect;
 								pElement->GetFlashPlayer()->GetViewport(x, y, width, height, aspect);
-								int iX = int_round(uv.x * (float)width);
-								int iY = int_round(uv.y * (float)height);
+								int iX = int_round(UOut * (float)width);
+								int iY = int_round(VOut * (float)height);
 
 								// call the function provided if it is present in the UIElement description
 								string funcName = GetPortString(pActInfo, EIP_CallFunction);

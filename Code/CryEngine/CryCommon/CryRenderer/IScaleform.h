@@ -235,7 +235,7 @@ public:
 	virtual void           SetView3D(const GMatrix3D& viewMatIn) override = 0;
 	virtual void           SetWorld3D(const GMatrix3D* pWorldMatIn) override = 0;
 
-	virtual void           SetVertexData(const void* pVertices, int numVertices, VertexFormat vf, CacheProvider* pCache = 0) override = 0;
+	virtual void           SetVertexData(const void* pVertices, int numVertices, SrcVertexFormat vf, CacheProvider* pCache = 0) override = 0;
 	virtual void           SetIndexData(const void* pIndices, int numIndices, IndexFormat idxf, CacheProvider* pCache = 0) override = 0;
 	virtual void           ReleaseCachedData(CachedData* pData, CachedDataType type) override = 0;
 

@@ -1200,20 +1200,20 @@ int CStatObj::SetDeformationMorphTarget(IStatObj* pDeformed)
 		return 0;
 
 	nVtxA0 = nVtxA = pMeshA->GetVerticesCount();
-	pVtxA.data = (Vec3*)pMeshA->GetPosPtr(pVtxA.iStride, FSL_READ);
-	pTexA.data = (Vec2*)pMeshA->GetUVPtr(pTexA.iStride, FSL_READ);
-	pTangentsA.data = (SPipTangents*)pMeshA->GetTangentPtr(pTangentsA.iStride, FSL_READ);
+	pVtxA = pMeshA->GetPositions(FSL_READ);
+	pTexA = pMeshA->GetTexCoords(FSL_READ);
+	pTangentsA = pMeshA->GetTangents(FSL_READ);
 
-	pVtxB.data = (Vec3*)pMeshB->GetPosPtr(pVtxB.iStride, FSL_READ);
-	pTexB.data = (Vec2*)pMeshB->GetUVPtr(pTexB.iStride, FSL_READ);
-	pTangentsB.data = (SPipTangents*)pMeshB->GetTangentPtr(pTangentsB.iStride, FSL_READ);
+	pVtxB = pMeshB->GetPositions(FSL_READ);
+	pTexB = pMeshB->GetTexCoords(FSL_READ);
+	pTangentsB = pMeshB->GetTangents(FSL_READ);
 
 	nFacesB = pMeshB->GetIndicesCount();
 	nFacesB /= 3;
-	pIdxB = pMeshB->GetIndexPtr(FSL_READ);
+	pIdxB = pMeshB->GetIndices(FSL_READ);
 	nIdxA = pMeshA->GetIndicesCount();
 	nFacesA = nIdxA /= 3;
-	pIdxA = pMeshA->GetIndexPtr(FSL_READ);
+	pIdxA = pMeshA->GetIndices(FSL_READ);
 
 	memset(pVtx2IdxA = new int[nVtxA + 1], 0, (nVtxA + 1) * sizeof(int));
 	for (i = 0; i < nIdxA; i++)
@@ -1255,17 +1255,17 @@ int CStatObj::SetDeformationMorphTarget(IStatObj* pDeformed)
 	{
 		pMeshA = GetRenderer()->CreateRenderMesh("StatObj_MorphTarget", GetFilePath());
 		m_pRenderMesh->CopyTo(pMeshA, nVtxAnew);
-		pVtxA.data = (Vec3*)pMeshA->GetPosPtr(pVtxA.iStride, FSL_SYSTEM_UPDATE);
-		pTexA.data = (Vec2*)pMeshA->GetUVPtr(pTexA.iStride, FSL_SYSTEM_UPDATE);
-		pTangentsA.data = (SPipTangents*)pMeshA->GetTangentPtr(pTangentsA.iStride, FSL_SYSTEM_UPDATE);
+		pVtxA = pMeshA->GetPositions(FSL_SYSTEM_UPDATE);
+		pTexA = pMeshA->GetTexCoords(FSL_SYSTEM_UPDATE);
+		pTangentsA = pMeshA->GetTangents(FSL_SYSTEM_UPDATE);
 		nIdxA = pMeshA->GetIndicesCount();
-		pIdxA = pMeshA->GetIndexPtr(FSL_READ);
+		pIdxA = pMeshA->GetIndices(FSL_READ);
 		m_pRenderMesh = pMeshA;
 	}
 
-	pVtxBnew.data = (Vec3*)pMeshBnew->GetPosPtr(pVtxBnew.iStride, FSL_SYSTEM_UPDATE);
-	pTexBnew.data = (Vec2*)pMeshBnew->GetUVPtr(pTexBnew.iStride, FSL_SYSTEM_UPDATE);
-	pTangentsBnew.data = (SPipTangents*)pMeshBnew->GetTangentPtr(pTangentsBnew.iStride, FSL_SYSTEM_UPDATE);
+	pVtxBnew = pMeshBnew->GetPositions(FSL_SYSTEM_UPDATE);
+	pTexBnew = pMeshBnew->GetTexCoords(FSL_SYSTEM_UPDATE);
+	pTangentsBnew = pMeshBnew->GetTangents(FSL_SYSTEM_UPDATE);
 
 	for (i = 0; i < nVtxA0; i++)
 		for (j = j0 = pVtx2IdxA[i]; j < pVtx2IdxA[i + 1]; j++)
@@ -1325,10 +1325,8 @@ static void         UpdateWeights(const Vec3& pt, float r, float strength, IRend
 {
 	int i, nVtx = pMesh->GetVerticesCount();
 	float r2 = r * r, rr = 1 / r;
-	strided_pointer<Vec3> pVtx;
-	strided_pointer<Vec2> pWeight;
-	pVtx.data = (Vec3*)pMesh->GetPosPtr(pVtx.iStride, FSL_SYSTEM_UPDATE);
-	pWeight.data = (Vec2*)pWeights->GetPosPtr(pWeight.iStride, FSL_SYSTEM_UPDATE);
+	auto pVtx = pMesh->GetPositions(FSL_SYSTEM_UPDATE);
+	auto pWeight = pWeights->GetPositions(FSL_SYSTEM_UPDATE);
 
 	if (r > 0)
 	{
@@ -1564,7 +1562,7 @@ IStatObj* CStatObj::UpdateVertices(strided_pointer<Vec3> pVtx, strided_pointer<V
 			memset(m_pClothTangentsData, 0, sizeof(SClothTangentVtx) * nVtxFull);
 			mesh_data* pmd = (mesh_data*)GetPhysGeom()->pGeom->GetData();
 			m_pRenderMesh->LockForThreadAccess();
-			pTangents.data = (SPipTangents*)m_pRenderMesh->GetTangentPtr(pTangents.iStride, FSL_READ);
+			pTangents = m_pRenderMesh->GetTangents(FSL_READ);
 			for (i = 0; i < pmd->nTris; i++)
 				for (j = 0; j < 3; j++)
 					ctd[pmd->pIndices[i * 3 + j]].ivtxT = i, ctd[pmd->pIndices[i * 3 + j]].sgnNorm = j;
@@ -1668,10 +1666,10 @@ IStatObj* CStatObj::UpdateVertices(strided_pointer<Vec3> pVtx, strided_pointer<V
 
 		IRenderMesh* mesh = pObj->m_pRenderMesh;
 		mesh->LockForThreadAccess();
-		pMeshVtx.data = (Vec3*)((mesh = pObj->m_pRenderMesh)->GetPosPtr(pMeshVtx.iStride, FSL_SYSTEM_UPDATE));
+		pMeshVtx = ((mesh = pObj->m_pRenderMesh)->GetPositions(FSL_SYSTEM_UPDATE));
 		if (m_hasClothTangentsData && m_pClothTangentsData)
 		{
-			pTangents.data = (SPipTangents*)mesh->GetTangentPtr(pTangents.iStride, FSL_SYSTEM_UPDATE);
+			pTangents = mesh->GetTangents(FSL_SYSTEM_UPDATE);
 		}
 
 		m_pAsyncUpdateContext->Set(&pObj->m_AABB.min, &pObj->m_AABB.max, iVtx0, nVtx, pVtx, pVtxMap, mask, rscale
@@ -1735,7 +1733,6 @@ void CStatObj::PrepareSkinData(const Matrix34& mtxSkelToMesh, IGeometry* pPhysSk
 	geom_contact* pcontact;
 	mesh_data* md;
 	IGeometry* pSphere, * pSphereBig;
-	strided_pointer<Vec3> pVtx;
 	Matrix34 mtxMeshToSkel = mtxSkelToMesh.GetInverted();
 	ITetrLattice* pLattice = GetTetrLattice();
 	if (pLattice)
@@ -1756,7 +1753,7 @@ void CStatObj::PrepareSkinData(const Matrix34& mtxSkelToMesh, IGeometry* pPhysSk
 	PREFAST_ASSUME(pPhysSkel);
 	md = (mesh_data*)pPhysSkel->GetData();
 	IRenderMesh::ThreadAccessLock lockrm(m_pRenderMesh);
-	pVtx.data = (Vec3*)m_pRenderMesh->GetPosPtr(pVtx.iStride, FSL_READ);
+	const auto pVtx = m_pRenderMesh->GetPositions(FSL_READ);
 	SSkinVtx* pSkinInfo = m_pSkinInfo = new SSkinVtx[nVtx = m_pRenderMesh->GetVerticesCount()];
 	m_hasSkinInfo = 1;
 
@@ -1816,8 +1813,6 @@ IStatObj* CStatObj::SkinVertices(strided_pointer<Vec3> pSkelVtx, const Matrix34&
 	if (!pObj->m_pClonedSourceObject || !pObj->m_pClonedSourceObject->m_pRenderMesh)
 		return pObj;
 
-	strided_pointer<Vec3> pVtx;
-	strided_pointer<SPipTangents> pTangents, pTangents0;
 	Vec3 vtx[4], t, b;
 	Matrix33 M;
 	AABB bbox;
@@ -1828,13 +1823,13 @@ IStatObj* CStatObj::SkinVertices(strided_pointer<Vec3> pSkelVtx, const Matrix34&
 		pObj->m_pRenderMesh->LockForThreadAccess();
 	pObj->m_pClonedSourceObject->m_pRenderMesh->LockForThreadAccess();
 
-	pVtx.data = (Vec3*)pObj->m_pRenderMesh->GetPosPtr(pVtx.iStride, FSL_SYSTEM_UPDATE);
-	pTangents.data = (SPipTangents*)pObj->m_pRenderMesh->GetTangentPtr(pTangents.iStride, FSL_SYSTEM_UPDATE);
-	pTangents0.data = (SPipTangents*)pObj->m_pClonedSourceObject->m_pRenderMesh->GetTangentPtr(pTangents0.iStride, FSL_READ);
+	auto pVtx = pObj->m_pRenderMesh->GetPositions(FSL_SYSTEM_UPDATE);
+	auto pTangents = pObj->m_pRenderMesh->GetTangents(FSL_SYSTEM_UPDATE);
+	const auto pTangents0 = pObj->m_pClonedSourceObject->m_pRenderMesh->GetTangents(FSL_READ);
 	nVtx = pObj->m_pRenderMesh->GetVerticesCount();
-	if (!pVtx.data)
+	if (!pVtx)
 		nVtx = 0;
-	const bool canUseTangents = pTangents.data && pTangents0.data;
+	const bool canUseTangents = pTangents && pTangents0;
 	for (i = 0; i < nVtx; i++)
 	{
 		Vec3 v3 = pVtx[i];
@@ -3119,15 +3114,12 @@ errorDetected:
 	primitives::box bbox;
 
 	int nMeshVtx, nMeshIdx;
-	unsigned short* pMeshIdx;
 	TRenderChunkArray& meshChunks = pRenderMesh->GetChunks();
 	nMeshVtx = pRenderMesh->GetVerticesCount();
 	nMeshIdx = pRenderMesh->GetIndicesCount();
-	strided_pointer<Vec3> pMeshVtx;
-	strided_pointer<Vec2> pMeshTex;
-	pMeshVtx.data = (Vec3*)pRenderMesh->GetPosPtr(pMeshVtx.iStride, FSL_READ);
-	pMeshTex.data = (Vec2*)pRenderMesh->GetUVPtr(pMeshTex.iStride, FSL_READ);
-	pMeshIdx = pRenderMesh->GetIndexPtr(FSL_READ);
+	const auto pMeshVtx = pRenderMesh->GetPositions(FSL_READ);
+	const auto pMeshTex = pRenderMesh->GetTexCoords(FSL_READ);
+	const auto pMeshIdx = pRenderMesh->GetIndices(FSL_READ);
 
 	// iterate through branch points branch#_#, build a branch structure
 	tm.SetIdentity();

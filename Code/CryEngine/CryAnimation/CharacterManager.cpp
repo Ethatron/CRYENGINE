@@ -1207,11 +1207,9 @@ SClothGeometry* CharacterManager::LoadVClothGeometry(const CAttachmentVCLOTH& pA
 	int nSimIndices = pSimRenderMesh->GetIndicesCount();
 
 	pSimRenderMesh->LockForThreadAccess();
-	strided_pointer<Vec3> pVertices;
-	pVertices.data = (Vec3*)pSimRenderMesh->GetPosPtr(pVertices.iStride, FSL_READ);
-	vtx_idx* pSimIndices = pSimRenderMesh->GetIndexPtr(FSL_READ);
-	strided_pointer<ColorB> pColors(0);
-	pColors.data = (ColorB*)pSimRenderMesh->GetColorPtr(pColors.iStride, FSL_READ);
+	const auto pVertices = pSimRenderMesh->GetPositions(FSL_READ);
+	const auto pSimIndices = pSimRenderMesh->GetIndices(FSL_READ);
+	const auto pColors = pSimRenderMesh->GetColors(FSL_READ);
 
 	// look for welded vertices and prune them
 	int nWelded = 0;
@@ -1297,14 +1295,12 @@ SClothGeometry* CharacterManager::LoadVClothGeometry(const CAttachmentVCLOTH& pA
 		int nTris = nIndices / 3;
 
 		pRenderMesh->LockForThreadAccess();
-		vtx_idx* pIndices = pRenderMesh->GetIndexPtr(FSL_READ);
+		const auto pIndices = pRenderMesh->GetIndices(FSL_READ);
 		ret.pIndices[lod] = new vtx_idx[nIndices];
 		memcpy(ret.pIndices[lod], pIndices, nIndices * sizeof(vtx_idx));
 
-		strided_pointer<Vec3> pVtx;
-		pVtx.data = (Vec3*)pRenderMesh->GetPosPtr(pVtx.iStride, FSL_READ);
-		strided_pointer<Vec2> pUVs;
-		pUVs.data = (Vec2*)pRenderMesh->GetUVPtr(pUVs.iStride, FSL_READ);
+		const auto pVtx = pRenderMesh->GetPositions(FSL_READ);
+		const auto pUVs = pRenderMesh->GetTexCoords(FSL_READ);
 
 		SSkinMapEntry* skinMap = new SSkinMapEntry[nVtx];
 		ret.skinMap[lod] = skinMap;

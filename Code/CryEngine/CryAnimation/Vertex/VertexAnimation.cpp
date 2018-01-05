@@ -230,8 +230,7 @@ bool CVertexAnimation::CompileCommands(CVertexCommandBuffer& commandBuffer)
 		pCommand->pTransformationRemapTable = m_skinData.pTransformationRemapTable;
 		pCommand->transformationCount = m_skinData.transformationCount;
 
-		pCommand->pVertexPositions.data = NULL;
-		pCommand->pVertexPositions.iStride = 0;
+		pCommand->pVertexPositions = strided_pointer<Vec3>(0, 0);
 		pCommand->pVertexPositionsPrevious = m_skinData.pVertexPositionsPrevious;
 		pCommand->pVertexQTangents = m_skinData.pVertexQTangents;
 		pCommand->pVertexTransformIndices = m_skinData.pVertexTransformIndices;

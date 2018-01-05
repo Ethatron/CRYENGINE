@@ -224,7 +224,6 @@ public:
 	virtual void  mfGetPlane(Plane& pl);
 	virtual bool  mfCompile(CParserBin& Parser, SParserFrame& Frame) { return false; }
 	virtual bool  mfDraw(CShader* ef, SShaderPass* sfm);
-	virtual void* mfGetPointer(ESrcPointer ePT, int* Stride, EParamType Type, ESrcPointer Dst, int Flags);
 	virtual bool  mfPreDraw(SShaderPass* sl)                                                 { return true; }
 	virtual bool  mfUpdate(InputLayoutHandle eVertFormat, int Flags, bool bTessellation = false) { return true; }
 	virtual void  mfPrecache(const SShaderItem& SH)                                          {}

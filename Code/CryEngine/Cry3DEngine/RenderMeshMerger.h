@@ -70,19 +70,13 @@ struct SMergedChunk
 
 struct SMergeBuffersData
 {
-	int      nPosStride;
-	int      nTexStride;
-	int      nColorStride;
-	int      nTangsStride;
-	int      nIndCount;
-	uint8*   pPos;
-	uint8*   pTex;
-	uint8*   pColor;
-	uint8*   pTangs;
-	vtx_idx* pSrcInds;
+	int                              nIndCount;
+	vtx_idx*                         pSrcInds;
+	strided_pointer<SVF_P3F_C4B_T2F> pGeneralF32;
+	strided_pointer<SVF_P3H_C4B_T2H> pGeneralF16;
+	strided_pointer<SPipTangents>    pTangents;
 #if ENABLE_NORMALSTREAM_SUPPORT
-	int      nNormStride;
-	uint8*   pNorm;
+	strided_pointer<SPipNormal>      pNormals;
 #endif
 };
 

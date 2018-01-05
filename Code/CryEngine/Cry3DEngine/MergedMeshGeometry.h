@@ -217,9 +217,9 @@ struct CRY_ALIGN(SMMRMSkinVertex_ALIGN) SMMRMSkinVertex
 {
 	float weights[4];
 	Vec3 pos;
-	SPipNormal normal;
 	Vec2 uv;
 	UCol colour;
+	SPipNormal normal;
 	SPipQTangents qt;
 	uint8 boneIds[4];
 
@@ -232,7 +232,7 @@ struct CRY_ALIGN(SMMRMSkinVertex_ALIGN) SMMRMSkinVertex
 	{
 		for (int i = 0; i < 4; ++i)
 		{
-			weights[i] = srcWeights[i] / 255.0f;
+			weights[i] = srcWeights[i] * (1.0f / 255.0f);
 		}
 	}
 
@@ -260,11 +260,12 @@ struct CRY_ALIGN(16) SMMRMChunk
 	int matId;
 	uint32 nvertices, nvertices_alloc;
 	uint32 nindices, nindices_alloc;
+	vtx_idx* indices;
 	SVF_P3F_C4B_T2F* general;
+	SVF_P3H_C4B_T2H* general16;
+	SPipNormal* normals;
 	SPipQTangents* qtangents;
 	SMMRMBoneMapping* weights;
-	SPipNormal* normals;
-	vtx_idx* indices;
 	SMMRMSkinVertex* skin_vertices;
 
 	SMMRMChunk(int _matId)
@@ -273,31 +274,34 @@ struct CRY_ALIGN(16) SMMRMChunk
 		  , nvertices_alloc()
 		  , nindices()
 		  , nindices_alloc()
-		  , general()
-		  , qtangents()
-		  , normals()
-		  , weights()
 		  , indices()
+		  , general()
+		  , general16()
+		  , normals()
+		  , qtangents()
+		  , weights()
 		  , skin_vertices()
 	{
 	}
 	~SMMRMChunk()
 	{
+		if (indices) CryModuleMemalignFree(indices);
 		if (general) CryModuleMemalignFree(general);
+		if (general16) CryModuleMemalignFree(general16);
+		if (normals) CryModuleMemalignFree(normals);
 		if (qtangents) CryModuleMemalignFree(qtangents);
 		if (weights) CryModuleMemalignFree(weights);
-		if (normals) CryModuleMemalignFree(normals);
-		if (indices) CryModuleMemalignFree(indices);
 		if (skin_vertices) CryModuleMemalignFree(skin_vertices);
 	}
 	uint32 Size() const
 	{
 		uint32 size = 0u;
-		size += sizeof(SVF_P3F_C4B_T2F) * nvertices_alloc;
+		size += sizeof(indices[0]) * nindices_alloc;
+		size += general ? sizeof(SVF_P3F_C4B_T2F) * nvertices_alloc : 0;
+		size += general16 ? sizeof(SVF_P3H_C4B_T2H) * nvertices_alloc : 0;
+		size += normals ? sizeof(SPipNormal) * nvertices_alloc : 0;
 		size += sizeof(SPipTangents) * nvertices_alloc;
 		size += weights ? sizeof(SMMRMBoneMapping) * nvertices_alloc : 0;
-		size += normals ? sizeof(SPipNormal) * nvertices_alloc : 0;
-		size += sizeof(indices[0]) * nindices_alloc;
 		size += (skin_vertices) ? sizeof(SMMRMSkinVertex) * nvertices_alloc : 0;
 		return size;
 	}

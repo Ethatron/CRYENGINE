@@ -12,11 +12,11 @@ typedef uint8  SoftwareVertexBlendWeight;
 struct CRY_ALIGN(64) SSoftwareVertexFormat
 {
 	Vec3 position;
-	uint32 color;
+	UCol color;
+	Vec2 coord;
 	Quat tangent;
 	SoftwareVertexBlendWeight weights[8];
 	SoftwareVertexBlendIndex indices[8];
-	Vec2 coord;
 };
 
 struct SSoftwareVertexFrameFormat
@@ -72,7 +72,7 @@ public:
 	const SSoftwareVertexFormat*                     GetVertices() const     { return m_vertices.begin(); }
 	uint                                             GetVertexCount() const  { return uint(m_vertices.size()); }
 	strided_pointer<const Vec3>                      GetPositions() const    { return strided_pointer<const Vec3>(&m_vertices[0].position, sizeof(m_vertices[0])); }
-	strided_pointer<const uint32>                    GetColors() const       { return strided_pointer<const uint32>(&m_vertices[0].color, sizeof(m_vertices[0])); }
+	strided_pointer<const UCol>                      GetColors() const       { return strided_pointer<const UCol>(&m_vertices[0].color, sizeof(m_vertices[0])); }
 	strided_pointer<const Vec2>                      GetCoords() const       { return strided_pointer<const Vec2>(&m_vertices[0].coord, sizeof(m_vertices[0])); }
 	strided_pointer<const Quat>                      GetTangents() const     { return strided_pointer<const Quat>(&m_vertices[0].tangent, sizeof(m_vertices[0])); }
 	strided_pointer<const SoftwareVertexBlendIndex>  GetBlendIndices() const { return strided_pointer<const SoftwareVertexBlendIndex>(&m_vertices[0].indices[0], sizeof(m_vertices[0])); }
@@ -96,7 +96,7 @@ private:
 	ILINE void                                 AllocateIndices(const uint count);
 
 	strided_pointer<Vec3>                      GetWritePositions()    { return strided_pointer<Vec3>(&m_vertices[0].position, sizeof(m_vertices[0])); }
-	strided_pointer<uint32>                    GetWriteColors()       { return strided_pointer<uint32>(&m_vertices[0].color, sizeof(m_vertices[0])); }
+	strided_pointer<UCol>                      GetWriteColors()       { return strided_pointer<UCol>(&m_vertices[0].color, sizeof(m_vertices[0])); }
 	strided_pointer<Vec2>                      GetWriteCoords()       { return strided_pointer<Vec2>(&m_vertices[0].coord, sizeof(m_vertices[0])); }
 	strided_pointer<Quat>                      GetWriteTangents()     { return strided_pointer<Quat>(&m_vertices[0].tangent, sizeof(m_vertices[0])); }
 	strided_pointer<SoftwareVertexBlendIndex>  GetWriteBlendIndices() { return strided_pointer<SoftwareVertexBlendIndex>(&m_vertices[0].indices[0], sizeof(m_vertices[0])); }
@@ -128,7 +128,7 @@ public:
 	const uint                    GetVertexCount() const { return m_vertexCount; }
 
 	strided_pointer<Vec3>         GetPositions()         { return pPositions; }
-	strided_pointer<uint32>       GetColors()            { return pColors; }
+	strided_pointer<UCol>         GetColors()            { return pColors; }
 	strided_pointer<Vec2>         GetCoords()            { return pCoords; }
 	strided_pointer<SPipTangents> GetTangents()          { return pTangents; }
 	strided_pointer<Vec3>         GetVelocities()        { return pVelocities; }
@@ -139,7 +139,7 @@ public:
 
 public:
 	strided_pointer<Vec3>         pPositions;
-	strided_pointer<uint32>       pColors;
+	strided_pointer<UCol>         pColors;
 	strided_pointer<Vec2>         pCoords;
 	strided_pointer<SPipTangents> pTangents;
 	strided_pointer<Vec3>         pVelocities;

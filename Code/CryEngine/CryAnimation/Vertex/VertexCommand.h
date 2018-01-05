@@ -41,11 +41,11 @@ struct VertexCommandCopy :
 	public VertexCommand
 {
 public:
-	strided_pointer<const Vec3>   pVertexPositions;
-	strided_pointer<const uint32> pVertexColors;
-	strided_pointer<const Vec2>   pVertexCoords;
+	strided_pointer<const Vec3> pVertexPositions;
+	strided_pointer<const UCol> pVertexColors;
+	strided_pointer<const Vec2> pVertexCoords;
 
-	const vtx_idx*                pIndices;
+	const vtx_idx*              pIndices;
 
 public:
 	VertexCommandCopy() :

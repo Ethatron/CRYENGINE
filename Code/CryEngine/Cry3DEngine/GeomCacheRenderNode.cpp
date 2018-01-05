@@ -977,12 +977,12 @@ _smart_ptr<IRenderMesh> CGeomCacheRenderNode::SetupDynamicRenderMesh(SGeomCacheR
 
 	pRenderMesh->LockForThreadAccess();
 
-	updateContext.m_pIndices = pRenderMesh->GetIndexPtr(FSL_VIDEO_CREATE);
-	updateContext.m_pPositions.data = (Vec3*)pRenderMesh->GetPosPtrNoCache(updateContext.m_pPositions.iStride, FSL_VIDEO_CREATE);
-	updateContext.m_pColors.data = (UCol*)pRenderMesh->GetColorPtr(updateContext.m_pColors.iStride, FSL_VIDEO_CREATE);
-	updateContext.m_pTexcoords.data = (Vec2*)pRenderMesh->GetUVPtrNoCache(updateContext.m_pTexcoords.iStride, FSL_VIDEO_CREATE);
-	updateContext.m_pTangents.data = (SPipTangents*)pRenderMesh->GetTangentPtr(updateContext.m_pTangents.iStride, FSL_VIDEO_CREATE);
-	updateContext.m_pVelocities.data = (Vec3*)pRenderMesh->GetVelocityPtr(updateContext.m_pVelocities.iStride, FSL_VIDEO_CREATE);
+	updateContext.m_pIndices = pRenderMesh->GetIndices(FSL_VIDEO_CREATE);
+	updateContext.m_pPositions = pRenderMesh->GetPositions(FSL_VIDEO_CREATE);
+	updateContext.m_pColors = pRenderMesh->GetColors(FSL_VIDEO_CREATE);
+	updateContext.m_pTexcoords = pRenderMesh->GetTexCoords(FSL_VIDEO_CREATE);
+	updateContext.m_pTangents = pRenderMesh->GetTangents(FSL_VIDEO_CREATE);
+	updateContext.m_pVelocities = pRenderMesh->GetVelocities(FSL_VIDEO_CREATE);
 
 	CRenderChunk chunk;
 	chunk.nNumVerts = meshData.m_numVertices;

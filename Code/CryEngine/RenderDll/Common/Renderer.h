@@ -1174,7 +1174,6 @@ public:
 
 	void   UpdateConstParamsPF(const SRenderingPassInfo& passInfo, bool bSecondaryViewport);
 
-	void*  EF_GetPointer(ESrcPointer ePT, int* Stride, EParamType Type, ESrcPointer Dst, int Flags);
 	uint32 GetActiveGPUCount() const override { return CV_r_multigpu > 0 ? m_nGPUs : 1; }
 
 	void   Logv(const char* format, ...);
@@ -1608,17 +1607,6 @@ protected:
 };
 
 //////////////////////////////////////////////////////////////////////////
-inline void* CRenderer::EF_GetPointer(ESrcPointer ePT, int* Stride, EParamType Type, ESrcPointer Dst, int Flags)
-{
-	void* p;
-
-	if (m_RP.m_pRE)
-		p = m_RP.m_pRE->mfGetPointer(ePT, Stride, Type, Dst, Flags);
-	else
-		p = SRendItem::mfGetPointerCommon(ePT, Stride, Type, Dst, Flags);
-
-	return p;
-}
 
 inline int32 CRenderer::RT_GetCurrGpuID() const
 {

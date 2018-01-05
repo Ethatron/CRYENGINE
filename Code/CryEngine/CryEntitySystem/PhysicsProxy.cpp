@@ -1377,9 +1377,8 @@ void CEntityPhysics::ReattachSoftEntityVtx(IPhysicalEntity* pAttachToEntity, int
 
 void CEntityPhysics::AttachSoftVtx(IRenderMesh* pRM, IPhysicalEntity* pAttachToEntity, int nAttachToPart)
 {
-	strided_pointer<ColorB> pColors(0);
 	pRM->LockForThreadAccess();
-	if ((pColors.data = (ColorB*)pRM->GetColorPtr(pColors.iStride, FSL_READ)))
+	if (const auto pColors = pRM->GetColors(FSL_READ))
 	{
 		pe_action_attach_points aap;
 		aap.nPoints = 0;
@@ -1392,7 +1391,7 @@ void CEntityPhysics::AttachSoftVtx(IRenderMesh* pRM, IPhysicalEntity* pAttachToE
 
 		for (i = 0; i < pRM->GetVerticesCount(); i++)
 		{
-			if (pColors[i].g == 0)
+			if (!pColors[i].g)
 			{
 				PREFAST_ASSUME(aap.nPoints >= 0 && aap.nPoints < verticesCount);
 				aap.piVtx[aap.nPoints++] = pVtxMap[i & ~mask] | i & mask;

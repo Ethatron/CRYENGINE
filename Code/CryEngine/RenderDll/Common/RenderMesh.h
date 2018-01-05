@@ -162,12 +162,6 @@ private:
   int   m_nRefCounter;
 	InputLayoutHandle m_eVF;          // Base stream vertex format (optional streams are hardcoded: VSF_)
 
-  Vec3 *m_pCachePos;         // float positions (cached)
-  int   m_nFrameRequestCachePos;
- 
-	Vec2 *m_pCacheUVs;         // float UVs (cached)
-	int   m_nFrameRequestCacheUVs;
-
   CRenderMesh *m_pVertexContainer;
   PodArray<CRenderMesh*>  m_lstVertexContainerUsers;
 
@@ -199,6 +193,7 @@ public:
 	};
 
 private:
+  bool (HasVertexStream)(int nStream) const { return m_VBStream[nStream] != nullptr; }
   SMeshStream* GetVertexStream(int nStream, uint32 nFlags = 0);
   SMeshStream* GetVertexStream(int nStream, uint32 nFlags = 0) const { return m_VBStream[nStream]; }
   bool UpdateVidIndices(SMeshStream& IBStream, bool stall=true);
@@ -213,21 +208,17 @@ private:
 
   void InitTriHash(IMaterial * pMaterial);
 
-  bool CreateCachePos(byte *pSrc, uint32 nStrideSrc, uint32 nFlags);
-  bool PrepareCachePos();
-	bool CreateCacheUVs(byte *pSrc, uint32 nStrideSrc, uint32 nFlags);	
-
 	//Internal versions of funcs - no lock
 	bool UpdateVertices_Int(const void *pVertBuffer, int nVertCount, int nOffset, int nStream, uint32 copyFlags);
   bool UpdateIndices_Int(const vtx_idx *pNewInds, int nInds, int nOffsInd, uint32 copyFlags);
   size_t SetMesh_Int( CMesh &mesh, int nSecColorsSetOffset, uint32 flags, const Vec3 *pPosOffset);	
 
 #ifdef MESH_TESSELLATION_RENDERER
-	template<class VertexFormat, class VecPos, class VecUV>
+	template<class SrcVertexFormat, class VecPos, class VecUV>
 	bool UpdateUVCoordsAdjacency(SMeshStream& IBStream);
 
-	template<class VertexFormat, class VecPos, class VecUV>
-	static void BuildAdjacency(const VertexFormat *pVerts, uint nVerts, const vtx_idx *pIndexBuffer, uint nTrgs, std::vector<VecUV> &pTxtAdjBuffer);
+	template<class SrcVertexFormat, class VecPos, class VecUV>
+	static void BuildAdjacency(const SrcVertexFormat *pVerts, uint nVerts, const vtx_idx *pIndexBuffer, uint nTrgs, std::vector<VecUV> &pTxtAdjBuffer);
 #endif
 
 	void Cleanup();
@@ -431,23 +422,30 @@ public:
 
   virtual void DrawImmediately();
 
-	virtual byte* GetPosPtrNoCache(int32& nStride, uint32 nFlags, int32 nOffset = 0) final;
-	virtual byte* GetPosPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0) final;
-	virtual byte* GetNormPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0) final;
-	virtual byte* GetColorPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0) final;
-	virtual byte* GetUVPtrNoCache(int32& nStride, uint32 nFlags, int32 nOffset = 0) final;
-	virtual byte* GetUVPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0) final;
+	virtual vtx_idx*                             GetIndices      (uint32 nFlags) final;
 
-	virtual byte* GetTangentPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0) final;
-	virtual byte* GetQTangentPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0) final;
+	// SVF_P3F_C4B_T2F
+	virtual strided_pointer<SVF_P3F_C4B_T2F>     GetGenerals     (uint32 nFlags) final;
+	virtual strided_pointer<Vec3           >     GetPositions    (uint32 nFlags) final;
+	virtual strided_pointer<UCol           >     GetColors       (uint32 nFlags) final;
+	virtual strided_pointer<Vec2           >     GetTexCoords    (uint32 nFlags) final;
+	virtual strided_pointer<SPipNormal     >     GetNormals      (uint32 nFlags) final;
 
-	virtual byte* GetHWSkinPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0, bool remapped = false) final;
-	virtual byte* GetVelocityPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0) final;
+	// SVF_P3H_C4B_T2H / SVF_P3H_C4B_T2H_N4C
+	virtual strided_pointer<SVF_P3H_C4B_T2H>     GetGeneralsF16  (uint32 nFlags) final;
+	virtual strided_pointer<Vec3f16        >     GetPositionsF16 (uint32 nFlags) final;
+	virtual strided_pointer<Vec2f16        >     GetTexCoordsF16 (uint32 nFlags) final;
+	virtual strided_pointer<SCol           >     GetNormalsI8    (uint32 nFlags) final;
+
+	virtual strided_pointer<SPipTangents   >     GetTangents     (uint32 nFlags) final;
+	virtual strided_pointer<SPipQTangents  >     GetQTangents    (uint32 nFlags) final;
+
+	virtual strided_pointer<SVF_W4B_I4U    >     GetHWSkinWeights(uint32 nFlags, bool remapped = false) final;
+	virtual strided_pointer<Vec3           >     GetVelocities   (uint32 nFlags) final;
 
 	virtual void UnlockStream(int nStream) final;
 	virtual void UnlockIndexStream() final;
 
-	virtual vtx_idx*                              GetIndexPtr(uint32 nFlags, int32 nOffset = 0) final;
 	virtual const PodArray<std::pair<int, int> >* GetTrisForPosition(const Vec3& vPos, IMaterial* pMaterial) final;
 	virtual float                                 GetExtent(EGeomForm eForm) final;
 	virtual void                                  GetRandomPos(PosNorm& ran, CRndGen& seed, EGeomForm eForm, SSkinningData const* pSkinning = NULL) final;

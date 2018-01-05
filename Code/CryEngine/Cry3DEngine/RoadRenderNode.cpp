@@ -617,17 +617,15 @@ void CRoadRenderNode::OnTerrainChanged()
 	if (!m_pRenderMesh)
 		return;
 
-	int nPosStride = 0;
-
 	IRenderMesh::ThreadAccessLock lock(m_pRenderMesh);
 
-	byte* pPos = m_pRenderMesh->GetPosPtr(nPosStride, FSL_SYSTEM_UPDATE);
+	auto pPos = m_pRenderMesh->GetPositions(FSL_SYSTEM_UPDATE);
 
 	Vec3 vWSBoxCenter = m_serializedData.worldSpaceBBox.GetCenter(); //vWSBoxCenter.z=0;
 
 	for (int i = 0, nVertsNum = m_pRenderMesh->GetVerticesCount(); i < nVertsNum; i++)
 	{
-		Vec3& vPos = *(Vec3*)&pPos[i * nPosStride];
+		Vec3& vPos = pPos[i];
 		vPos.z = GetTerrain()->GetZApr(vWSBoxCenter.x + vPos.x, vWSBoxCenter.y + vPos.y, /*m_nSID*/ GetDefSID()) + 0.01f - vWSBoxCenter.z;
 	}
 	m_pRenderMesh->UnlockStream(VSF_GENERAL);

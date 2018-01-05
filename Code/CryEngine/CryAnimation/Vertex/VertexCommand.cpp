@@ -300,7 +300,7 @@ void VertexCommandCopy::Execute(VertexCommandCopy& command, CVertexData& vertexD
 
 	const uint vertexCount = vertexData.GetVertexCount();
 	strided_pointer<Vec3> pPositions = vertexData.GetPositions();
-	strided_pointer<uint32> pColors = vertexData.GetColors();
+	strided_pointer<UCol> pColors = vertexData.GetColors();
 	strided_pointer<Vec2> pCoords = vertexData.GetCoords();
 
 	for (uint i = 0; i < vertexCount; ++i)

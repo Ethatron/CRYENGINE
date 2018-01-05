@@ -1650,32 +1650,22 @@ void CRopeRenderNode::UpdateRenderMesh()
 	m_pRenderMesh->LockForThreadAccess();
 	m_pRenderMesh->UpdateVertices(NULL, nNewVertexCount, 0, VSF_GENERAL, 0u);
 
-	int nPosStride = 0;
-	int nUVStride = 0;
-	int nTangsStride = 0;
-
-	byte* pVertPos = m_pRenderMesh->GetPosPtr(nPosStride, FSL_VIDEO_CREATE);
+	auto pVertPos = m_pRenderMesh->GetPositions(FSL_VIDEO_CREATE);
 	if (!pVertPos)
 		return;
-	byte* pVertTexUV = m_pRenderMesh->GetUVPtr(nUVStride, FSL_VIDEO_CREATE);
-
-	byte* pTangents = m_pRenderMesh->GetTangentPtr(nTangsStride, FSL_VIDEO_CREATE);
+	auto pVertTexUV = m_pRenderMesh->GetTexCoords(FSL_VIDEO_CREATE);
+	auto pTangents = m_pRenderMesh->GetTangents(FSL_VIDEO_CREATE);
 
 	for (int i = 0; i < nNewVertexCount; i++)
 	{
 		Vec3 vP = Vec3(tubeSurf.m_akVertex[i].x, tubeSurf.m_akVertex[i].y, tubeSurf.m_akVertex[i].z);
 		Vec2 vT = Vec2(tubeSurf.m_akTexture[i].x, tubeSurf.m_akTexture[i].y);
 
-		*((Vec3*)pVertPos) = vP;
-		*((Vec2*)pVertTexUV) = vT;
-
-		*(SPipTangents*)pTangents = SPipTangents(
+		pVertPos[i] = vP;
+		pVertTexUV[i] = vT;
+		pTangents[i] = SPipTangents(
 		  tubeSurf.m_akTangents[i],
 		  tubeSurf.m_akBitangents[i], 1);
-
-		pVertPos += nPosStride;
-		pVertTexUV += nUVStride;
-		pTangents += nTangsStride;
 	}
 
 	m_pRenderMesh->UnlockStream(VSF_GENERAL);

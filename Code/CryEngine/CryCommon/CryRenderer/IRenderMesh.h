@@ -4,6 +4,7 @@
 #define _RenderMesh_H_
 
 #include "VertexFormats.h"
+#include <CryCore/stridedptr.h>
 #include <Cry3DEngine/IMaterial.h>
 #include <CryRenderer/IShader.h>
 #include <CryRenderer/IRenderer.h>  // PublicRenderPrimitiveType
@@ -189,23 +190,30 @@ struct IRenderMesh
 	virtual uint32*                              GetPhysVertexMap() = 0;
 	virtual bool                                 IsEmpty() = 0;
 
-	virtual byte*                                GetPosPtrNoCache(int32& nStride, uint32 nFlags, int32 nOffset = 0) = 0;
-	virtual byte*                                GetPosPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0) = 0;
-	virtual byte*                                GetColorPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0) = 0;
-	virtual byte*                                GetNormPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0) = 0;
-	virtual byte*                                GetUVPtrNoCache(int32& nStride, uint32 nFlags, int32 nOffset = 0) = 0;
-	virtual byte*                                GetUVPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0) = 0;
+	virtual vtx_idx*                             GetIndices      (uint32 nFlags) = 0;
 
-	virtual byte*                                GetTangentPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0) = 0;
-	virtual byte*                                GetQTangentPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0) = 0;
+	// SVF_P3F_C4B_T2F
+	virtual strided_pointer<SVF_P3F_C4B_T2F>     GetGenerals     (uint32 nFlags) = 0;
+	virtual strided_pointer<Vec3           >     GetPositions    (uint32 nFlags) = 0;
+	virtual strided_pointer<UCol           >     GetColors       (uint32 nFlags) = 0;
+	virtual strided_pointer<Vec2           >     GetTexCoords    (uint32 nFlags) = 0;
+	virtual strided_pointer<SPipNormal     >     GetNormals      (uint32 nFlags) = 0;
 
-	virtual byte*                                GetHWSkinPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0, bool remapped = false) = 0;
-	virtual byte*                                GetVelocityPtr(int32& nStride, uint32 nFlags, int32 nOffset = 0) = 0;
+	// SVF_P3H_C4B_T2H / SVF_P3H_C4B_T2H_N4C
+	virtual strided_pointer<SVF_P3H_C4B_T2H>     GetGeneralsF16  (uint32 nFlags) = 0;
+	virtual strided_pointer<Vec3f16        >     GetPositionsF16 (uint32 nFlags) = 0;
+	virtual strided_pointer<Vec2f16        >     GetTexCoordsF16 (uint32 nFlags) = 0;
+	virtual strided_pointer<SCol           >     GetNormalsI8    (uint32 nFlags) = 0;
+
+	virtual strided_pointer<SPipTangents   >     GetTangents     (uint32 nFlags) = 0;
+	virtual strided_pointer<SPipQTangents  >     GetQTangents    (uint32 nFlags) = 0;
+
+	virtual strided_pointer<SVF_W4B_I4U    >     GetHWSkinWeights(uint32 nFlags, bool remapped = false) = 0;
+	virtual strided_pointer<Vec3           >     GetVelocities   (uint32 nFlags) = 0;
 
 	virtual void                                 UnlockStream(int nStream) = 0;
 	virtual void                                 UnlockIndexStream() = 0;
 
-	virtual vtx_idx*                             GetIndexPtr(uint32 nFlags, int32 nOffset = 0) = 0;
 	virtual const PodArray<std::pair<int, int>>* GetTrisForPosition(const Vec3& vPos, IMaterial* pMaterial) = 0;
 
 	virtual float                                GetExtent(EGeomForm eForm) = 0;

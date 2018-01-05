@@ -1384,10 +1384,9 @@ cloth_aux:
 			{
 				IStatObj* pStatObj = m_pInstance->m_AttachmentManager.GetInterfaceByIndex(idxAttachment)->GetIAttachmentObject()->GetIStatObj();
 				IRenderMesh* pRM = pStatObj->GetRenderMesh();
-				strided_pointer<ColorB> pColors(0);
 				pRM->LockForThreadAccess();
 				aap.partid = iFirstBone;
-				if ((pColors.data = (ColorB*)pRM->GetColorPtr(pColors.iStride, FSL_READ)))
+				if (const auto pColors = pRM->GetColors(FSL_READ))
 				{
 					for (aap.nPoints = 0, i = 0; i < pRM->GetVerticesCount(); aap.nPoints += iszero(pColors[i++].g))
 						;

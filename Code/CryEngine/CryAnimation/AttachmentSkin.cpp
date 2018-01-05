@@ -685,10 +685,10 @@ void CAttachmentSKIN::DrawAttachment(SRendParams& RendParams, const SRenderingPa
 			if (pRenderMeshPrevious != NULL)
 			{
 				pRenderMeshPrevious->LockForThreadAccess();
-				Vec3* pPrevPositions = (Vec3*)pRenderMeshPrevious->GetPosPtrNoCache(vertexSkinData.pVertexPositionsPrevious.iStride, fslRead);
+				auto pPrevPositions = pRenderMeshPrevious->GetPositions(fslRead);
 				if (pPrevPositions)
 				{
-					vertexSkinData.pVertexPositionsPrevious.data = pPrevPositions;
+					vertexSkinData.pVertexPositionsPrevious = pPrevPositions;
 					pVertexAnimation->m_previousRenderMesh = pRenderMeshPrevious; 
 				}
 				else
@@ -703,22 +703,17 @@ void CAttachmentSKIN::DrawAttachment(SRendParams& RendParams, const SRenderingPa
 
 			pRenderMesh->LockForThreadAccess();
 
-			SVF_P3F_C4B_T2F *pGeneral = (SVF_P3F_C4B_T2F*)pRenderMesh->GetPosPtrNoCache(pVertexAnimation->vertexData.pPositions.iStride, fslCreate);
-
-			pVertexAnimation->vertexData.pPositions.data    = (Vec3*)(&pGeneral[0].xyz);
-			pVertexAnimation->vertexData.pPositions.iStride = sizeof(pGeneral[0]);
-			pVertexAnimation->vertexData.pColors.data       = (uint32*)(&pGeneral[0].color);
-			pVertexAnimation->vertexData.pColors.iStride    = sizeof(pGeneral[0]);
-			pVertexAnimation->vertexData.pCoords.data       = (Vec2*)(&pGeneral[0].st);
-			pVertexAnimation->vertexData.pCoords.iStride    = sizeof(pGeneral[0]);
-			pVertexAnimation->vertexData.pVelocities.data = (Vec3*)pRenderMesh->GetVelocityPtr(pVertexAnimation->vertexData.pVelocities.iStride, fslCreate);
-			pVertexAnimation->vertexData.pTangents.data = (SPipTangents*)pRenderMesh->GetTangentPtr(pVertexAnimation->vertexData.pTangents.iStride, fslCreate);
-			pVertexAnimation->vertexData.pIndices = pRenderMesh->GetIndexPtr(fslCreate);
+			pVertexAnimation->vertexData.pPositions = pRenderMesh->GetPositions(fslCreate);
+			pVertexAnimation->vertexData.pColors = pRenderMesh->GetColors(fslCreate);
+			pVertexAnimation->vertexData.pCoords = pRenderMesh->GetTexCoords(fslCreate);
+			pVertexAnimation->vertexData.pVelocities = pRenderMesh->GetVelocities(fslCreate);
+			pVertexAnimation->vertexData.pTangents = pRenderMesh->GetTangents(fslCreate);
+			pVertexAnimation->vertexData.pIndices = pRenderMesh->GetIndices(fslCreate);
 			pVertexAnimation->vertexData.m_indexCount = geometry.GetIndexCount();
 
 			if (!pVertexAnimation->vertexData.pPositions ||
-				!pVertexAnimation->vertexData.pVelocities ||
-				!pVertexAnimation->vertexData.pTangents)
+			    !pVertexAnimation->vertexData.pVelocities ||
+			    !pVertexAnimation->vertexData.pTangents)
 			{
 				pRenderMesh->UnlockStream(VSF_GENERAL); 
 				pRenderMesh->UnlockStream(VSF_TANGENTS);
@@ -1028,9 +1023,7 @@ void CAttachmentSKIN::DrawVertexDebug(	IRenderMesh* pRenderMesh, const QuatT& lo
 
 	IRenderMesh* pIRenderMesh = pRenderMesh;
 	strided_pointer<Vec3> parrDstPositions = pVertexAnimation->vertexData.pPositions;
-	strided_pointer<SPipTangents> parrDstTangents;
-	parrDstTangents.data = (SPipTangents*)pVertexAnimation->vertexData.pTangents.data; 
-	parrDstTangents.iStride = sizeof(SPipTangents);
+	strided_pointer<SPipTangents> parrDstTangents = pVertexAnimation->vertexData.pTangents; 
 
 	uint32 numExtVertices = pIRenderMesh->GetVerticesCount();
 	if (parrDstPositions && parrDstTangents)
@@ -1070,7 +1063,7 @@ void CAttachmentSKIN::DrawVertexDebug(	IRenderMesh* pRenderMesh, const QuatT& lo
 
 			pIRenderMesh->LockForThreadAccess();
 			uint32	numIndices = pIRenderMesh->GetIndicesCount();
-			vtx_idx* pIndices = pIRenderMesh->GetIndexPtr(FSL_READ);
+			const auto pIndices = pIRenderMesh->GetIndices(FSL_READ);
 
 			IRenderAuxGeom*	pAuxGeom =	gEnv->pRenderer->GetIRenderAuxGeom();
 			SAuxGeomRenderFlags renderFlags( e_Def3DPublicRenderflags );
@@ -1194,21 +1187,13 @@ void CAttachmentSKIN::SoftwareSkinningDQ_VS_Emulator( CModelMesh* pModelMesh, Ma
 	pModelMesh->m_pIRenderMesh->LockForThreadAccess();
 	++pModelMesh->m_iThreadMeshAccessCounter;
 
-	vtx_idx* pIndices				= pModelMesh->m_pIRenderMesh->GetIndexPtr(FSL_READ);
-	if (pIndices==0)
+	const auto pIndices = pModelMesh->m_pIRenderMesh->GetIndices(FSL_READ);
+	const auto pPositions = pModelMesh->m_pIRenderMesh->GetPositions(FSL_READ);
+	const auto pQTangents = pModelMesh->m_pIRenderMesh->GetQTangents(FSL_READ);
+	const auto pSkinningInfo = pModelMesh->m_pIRenderMesh->GetHWSkinWeights(FSL_READ); //pointer to weights and bone-id
+
+	if (pIndices == 0 || pPositions == 0 || pQTangents == 0 || pSkinningInfo == 0)
 		return;
-	int32		nPositionStride;
-	uint8*	pPositions			= pModelMesh->m_pIRenderMesh->GetPosPtr(nPositionStride, FSL_READ);
-	if (pPositions==0)
-		return;
-	int32		nQTangentStride;
-	uint8*	pQTangents			= pModelMesh->m_pIRenderMesh->GetQTangentPtr(nQTangentStride, FSL_READ);
-	if (pQTangents==0)
-		return;
-	int32		nSkinningStride;
-	uint8 * pSkinningInfo				= pModelMesh->m_pIRenderMesh->GetHWSkinPtr(nSkinningStride, FSL_READ); //pointer to weights and bone-id
-	if (pSkinningInfo==0)
-		return;	
 
 	DualQuat arrRemapSkinQuat[MAX_JOINT_AMOUNT];	//dual quaternions for skinning
 	for (size_t b = 0; b < m_arrRemapTable.size(); ++b)
@@ -1234,11 +1219,11 @@ void CAttachmentSKIN::SoftwareSkinningDQ_VS_Emulator( CModelMesh* pModelMesh, Ma
 			if (arrSkinned[e])
 				continue;
 
-			arrSkinned[e]=1;
-			Vec3		hwPosition	= *(Vec3*)(pPositions + e * nPositionStride) + pModelMesh->m_vRenderMeshOffset;
-			SMeshQTangents	hwQTangent	= *(SMeshQTangents*)(pQTangents + e * nQTangentStride);
-			uint16*	hwIndices   = ((SVF_W4B_I4U*)(pSkinningInfo + e*nSkinningStride))->indices;
-			ColorB	hwWeights		= *(ColorB*)&((SVF_W4B_I4U*)(pSkinningInfo + e*nSkinningStride))->weights;
+			arrSkinned[e] = 1;
+			Vec3          hwPosition = pPositions[e] + pModelMesh->m_vRenderMeshOffset;
+			SPipQTangents hwQTangent = pQTangents[e];
+			const uint16* hwIndices = pSkinningInfo[e].indices;
+			UCol	      hwWeights = pSkinningInfo[e].weights;
 
 			//---------------------------------------------------------------------
 			//---     this is CPU emulation of Dual-Quat skinning              ---
@@ -1254,10 +1239,10 @@ void CAttachmentSKIN::SoftwareSkinningDQ_VS_Emulator( CModelMesh* pModelMesh, Ma
 			assert(id3 < m_arrRemapTable.size());
 
 			//get weights for vertices (always 4 weights per vertex)
-			f32 w0 = hwWeights[0]/255.0f;
-			f32 w1 = hwWeights[1]/255.0f;
-			f32 w2 = hwWeights[2]/255.0f;
-			f32 w3 = hwWeights[3]/255.0f;
+			f32 w0 = hwWeights.bcolor[0] * (1.0f / 255.0f);
+			f32 w1 = hwWeights.bcolor[1] * (1.0f / 255.0f);
+			f32 w2 = hwWeights.bcolor[2] * (1.0f / 255.0f);
+			f32 w3 = hwWeights.bcolor[3] * (1.0f / 255.0f);
 			assert(fabsf((w0+w1+w2+w3)-1.0f)<0.0001f);
 
 			const DualQuat& q0=arrRemapSkinQuat[id0];

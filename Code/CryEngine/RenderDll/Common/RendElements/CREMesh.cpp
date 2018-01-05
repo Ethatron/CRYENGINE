@@ -140,39 +140,6 @@ bool CREMeshImpl::mfUpdate(InputLayoutHandle eVertFormat, int Flags, bool bTesse
 	return true;
 }
 
-void* CREMeshImpl::mfGetPointer(ESrcPointer ePT, int* Stride, EParamType Type, ESrcPointer Dst, int Flags)
-{
-	DETAILED_PROFILE_MARKER("CREMeshImpl::mfGetPointer");
-	CRenderMesh* pRM = m_pRenderMesh->_GetVertexContainer();
-	byte* pD = NULL;
-	IRenderMesh::ThreadAccessLock lock(pRM);
-
-	switch (ePT)
-	{
-	case eSrcPointer_Vert:
-		pD = pRM->GetPosPtr(*Stride, FSL_READ);
-		break;
-	case eSrcPointer_Tex:
-		pD = pRM->GetUVPtr(*Stride, FSL_READ);
-		break;
-	case eSrcPointer_Normal:
-		pD = pRM->GetNormPtr(*Stride, FSL_READ);
-		break;
-	case eSrcPointer_Tangent:
-		pD = pRM->GetTangentPtr(*Stride, FSL_READ);
-		break;
-	case eSrcPointer_Color:
-		pD = pRM->GetColorPtr(*Stride, FSL_READ);
-		break;
-	default:
-		assert(false);
-		break;
-	}
-	if (m_nFirstVertId && pD)
-		pD += m_nFirstVertId * (*Stride);
-	return pD;
-}
-
 void CREMeshImpl::mfGetPlane(Plane& pl)
 {
 	CRenderMesh* pRM = m_pRenderMesh->_GetVertexContainer();

@@ -956,10 +956,8 @@ void CDecalManager::MoveToEdge(IRenderMesh* pRM, const float fRadius, Vec3& vOut
 		return;
 
 	// get position offset and stride
-	int nPosStride = 0;
-	byte* pPos = pRM->GetPosPtr(nPosStride, FSL_READ);
-
-	vtx_idx* pInds = pRM->GetIndexPtr(FSL_READ);
+	const auto pPos = pRM->GetPositions(FSL_READ);
+	const auto pInds = pRM->GetIndices(FSL_READ);
 
 	if (!pPos || !pInds)
 		return;
@@ -1000,9 +998,9 @@ void CDecalManager::MoveToEdge(IRenderMesh* pRM, const float fRadius, Vec3& vOut
 			assert(pInds[i + 2] >= pChunk->nFirstVertId);
 
 			// get tri vertices
-			Vec3 v0 = (*(Vec3*)&pPos[nPosStride * pInds[i + 0]]);
-			Vec3 v1 = (*(Vec3*)&pPos[nPosStride * pInds[i + 1]]);
-			Vec3 v2 = (*(Vec3*)&pPos[nPosStride * pInds[i + 2]]);
+			const Vec3 v0 = pPos[pInds[i + 0]];
+			const Vec3 v1 = pPos[pInds[i + 1]];
+			const Vec3 v2 = pPos[pInds[i + 2]];
 
 			bool first = false;
 			bool second = false;
@@ -1067,12 +1065,10 @@ void CDecalManager::FillBigDecalIndices(IRenderMesh* pRM, Vec3 vPos, float fRadi
 
 	CDecalRenderNode::m_nFillBigDecalIndicesCounter++;
 
-	int nPosStride = 0;
-	byte* pPos = pRM->GetPosPtr(nPosStride, FSL_READ);
-	if (!pPos)
-		return;
-	vtx_idx* pInds = pRM->GetIndexPtr(FSL_READ);
-	if (!pInds)
+	const auto pPos = pRM->GetPositions(FSL_READ);
+	const auto pInds = pRM->GetIndices(FSL_READ);
+
+	if (!pInds || !pPos)
 		return;
 
 	assert(nInds % 3 == 0);
@@ -1130,9 +1126,9 @@ void CDecalManager::FillBigDecalIndices(IRenderMesh* pRM, Vec3 vPos, float fRadi
 
 				int i = pChunk->nFirstIndexId;
 
-				int iPosIndex0 = nPosStride * pInds[i + 0];
-				int iPosIndex1 = nPosStride * pInds[i + 1];
-				int iPosIndex2 = nPosStride * pInds[i + 2];
+				int iPosIndex0 = pInds[i + 0];
+				int iPosIndex1 = pInds[i + 1];
+				int iPosIndex2 = pInds[i + 2];
 
 				for (; i < nLastIndexId; i += 3)
 				{
@@ -1151,9 +1147,9 @@ void CDecalManager::FillBigDecalIndices(IRenderMesh* pRM, Vec3 vPos, float fRadi
 
 					if (i + 5 < nLastIndexId)
 					{
-						iNextPosIndex0 = nPosStride * pInds[i + 3];
-						iNextPosIndex1 = nPosStride * pInds[i + 4];
-						iNextPosIndex2 = nPosStride * pInds[i + 5];
+						iNextPosIndex0 = pInds[i + 3];
+						iNextPosIndex1 = pInds[i + 4];
+						iNextPosIndex2 = pInds[i + 5];
 
 						PrefetchLine(&pPos[iNextPosIndex0], 0);
 						PrefetchLine(&pPos[iNextPosIndex1], 0);
@@ -1161,9 +1157,9 @@ void CDecalManager::FillBigDecalIndices(IRenderMesh* pRM, Vec3 vPos, float fRadi
 					}
 
 					// get tri vertices
-					const Vec3 v0 = *reinterpret_cast<Vec3*>(&pPos[iPosIndex0]);
-					const Vec3 v1 = *reinterpret_cast<Vec3*>(&pPos[iPosIndex1]);
-					const Vec3 v2 = *reinterpret_cast<Vec3*>(&pPos[iPosIndex2]);
+					const Vec3 v0 = pPos[iPosIndex0];
+					const Vec3 v1 = pPos[iPosIndex1];
+					const Vec3 v2 = pPos[iPosIndex2];
 
 					// test the face
 					Vec3 v0v1Diff = v0 - v1;
@@ -1240,18 +1236,18 @@ void CDecalManager::FillBigDecalIndices(IRenderMesh* pRM, Vec3 vPos, float fRadi
 
 				if (i + 5 < nLastIndexId)
 				{
-					iNextPosIndex0 = nPosStride * pInds[i + 3];
-					iNextPosIndex1 = nPosStride * pInds[i + 4];
-					iNextPosIndex2 = nPosStride * pInds[i + 5];
+					iNextPosIndex0 = pInds[i + 3];
+					iNextPosIndex1 = pInds[i + 4];
+					iNextPosIndex2 = pInds[i + 5];
 
 					PrefetchLine(&pPos[iNextPosIndex0], 0);
 					PrefetchLine(&pPos[iNextPosIndex1], 0);
 					PrefetchLine(&pPos[iNextPosIndex2], 0);
 				}
 
-				Vec3 v0Next = *reinterpret_cast<Vec3*>(&pPos[nPosStride * pInds[i + 0]]);
-				Vec3 v1Next = *reinterpret_cast<Vec3*>(&pPos[nPosStride * pInds[i + 1]]);
-				Vec3 v2Next = *reinterpret_cast<Vec3*>(&pPos[nPosStride * pInds[i + 2]]);
+				Vec3 v0Next = pPos[pInds[i + 0]];
+				Vec3 v1Next = pPos[pInds[i + 1]];
+				Vec3 v2Next = pPos[pInds[i + 2]];
 
 				const int nLastIndexToUse = nLastIndexId - 3;
 
@@ -1265,7 +1261,7 @@ void CDecalManager::FillBigDecalIndices(IRenderMesh* pRM, Vec3 vPos, float fRadi
 					assert(pInds[i + 2] >= pChunk->nFirstVertId);
 
 					const int iLookaheadIdx = min_branchless(i + 8, nLastValidIndexId);
-					const int iPrefetchIndex2 = nPosStride * pInds[iLookaheadIdx];
+					const int iPrefetchIndex2 = pInds[iLookaheadIdx];
 
 					// get tri vertices
 					const Vec3 v0 = v0Next;
@@ -1273,21 +1269,21 @@ void CDecalManager::FillBigDecalIndices(IRenderMesh* pRM, Vec3 vPos, float fRadi
 					const Vec3 v2 = v2Next;
 
 					//Need to prefetch further ahead
-					byte* pPrefetch = &pPos[iPrefetchIndex2];
+					auto pPrefetch = &pPos[iPrefetchIndex2];
 					PrefetchLine(pPrefetch, 0);
 
-					v0Next = *reinterpret_cast<Vec3*>(&pPos[iNextPosIndex0]);
+					v0Next = pPos[iNextPosIndex0];
 
 					// get triangle normal
 					Vec3 v1v0Diff = v1 - v0;
 					Vec3 v2v0Diff = v2 - v0;
 
-					v1Next = *reinterpret_cast<Vec3*>(&pPos[iNextPosIndex1]);
+					v1Next = pPos[iNextPosIndex1];
 
 					Vec3 vNormal = v1v0Diff ^ v2v0Diff;
 					float fDot = vNormal | vProjDir;
 
-					v2Next = *reinterpret_cast<Vec3*>(&pPos[iNextPosIndex2]);
+					v2Next = pPos[iNextPosIndex2];
 
 					// test the face
 					if (fDot > fEpsilon)
@@ -1309,8 +1305,8 @@ void CDecalManager::FillBigDecalIndices(IRenderMesh* pRM, Vec3 vPos, float fRadi
 						}
 					}
 
-					iNextPosIndex0 = nPosStride * pInds[iLookaheadIdx - 2];
-					iNextPosIndex1 = nPosStride * pInds[iLookaheadIdx - 1];
+					iNextPosIndex0 = pInds[iLookaheadIdx - 2];
+					iNextPosIndex1 = pInds[iLookaheadIdx - 1];
 					iNextPosIndex2 = iPrefetchIndex2;
 				}
 

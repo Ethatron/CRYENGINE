@@ -726,6 +726,8 @@ bool CMeshCompiler::Compile(CMesh& mesh, int flags)
 		outMesh.ReallocStream(CMesh::TEXCOORDS, max_vert_num);
 	if (flags & MESH_COMPILE_TANGENTS)
 		outMesh.ReallocStream(CMesh::TANGENTS, max_vert_num);
+	else if (flags & MESH_COMPILE_USE_CUSTOM_NORMALS)
+		outMesh.ReallocStream(CMesh::NORMALS, max_vert_num);
 	if (mesh.m_pColors)
 		outMesh.ReallocStream(CMesh::COLORS, max_vert_num);
 

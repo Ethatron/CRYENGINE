@@ -194,40 +194,36 @@ void CRenderMeshMerger::MakeListOfAllCRenderChunks(SMergeInfo& info)
 
 		int nInitVertCout = m_lstVerts.Count();
 
-		int nPosStride = 0;
-		int nTexStride = 0;
-		int nColorStride = 0;
-		Vec3* pPos = 0;
-		Vec2* pTex = 0;
-		UCol* pColor = 0;
+		strided_pointer<SVF_P3F_C4B_T2F> pGeneralF32 = nullptr;
+		strided_pointer<SVF_P3H_C4B_T2H> pGeneralF16 = nullptr;
+		strided_pointer<SPipNormal> pNorm = nullptr;
+		strided_pointer<SPipTangents> pTangs = nullptr;
 
 		// get vertices's
 		{
 			FRAME_PROFILER("CRenderMeshMerger::MakeListOfAllCRenderChunks_GetPosPtr", GetSystem(), PROFILE_3DENGINE);
 
-			pPos = reinterpret_cast<Vec3*>(pRM->GetPosPtr(nPosStride, FSL_READ));
-			pTex = reinterpret_cast<Vec2*>(pRM->GetUVPtr(nTexStride, FSL_READ));
-			pColor = reinterpret_cast<UCol*>(pRM->GetColorPtr(nColorStride, FSL_READ));
+			if (pRM->GetVertexFormat() == EDefaultInputLayouts::P3F_C4B_T2F)
+				pGeneralF32 = pRM->GetGenerals(FSL_READ);
+			else if (pRM->GetVertexFormat() == EDefaultInputLayouts::P3H_C4B_T2H)
+				pGeneralF16 = pRM->GetGeneralsF16(FSL_READ);
+			else
+				CRY_ASSERT(false);
 		}
 
-		if (!pPos || !pTex || !pColor)
+		if (!pGeneralF32 || !pGeneralF16)
 			continue;
 
 		// get tangent basis
-		int nNormStride = 0;
-		int nTangsStride = 0;
-		byte* pNorm = 0;
-		byte* pTangs = 0;
-
 		if (pRM->GetVertexFormat() != EDefaultInputLayouts::P3H_C4B_T2H_N4C)
 		{
-			pTangs = pRM->GetTangentPtr(nTangsStride, FSL_READ);
+			pTangs = pRM->GetTangents(FSL_READ);
 		}
 
 #if ENABLE_NORMALSTREAM_SUPPORT
 		// get normal stream
 		{
-			pNorm = pRM->GetNormPtr(nNormStride, FSL_READ);
+			pNorm = pRM->GetNormals(FSL_READ);
 		}
 #endif
 
@@ -236,7 +232,7 @@ void CRenderMeshMerger::MakeListOfAllCRenderChunks(SMergeInfo& info)
 
 		// get indices
 		uint32 nIndCount = pRM->GetIndicesCount();
-		vtx_idx* pSrcInds = pRM->GetIndexPtr(FSL_READ);
+		const auto pSrcInds = pRM->GetIndices(FSL_READ);
 
 		Vec3 vOSPos(0, 0, 0);
 		Vec3 vOSProjDir(0, 0, 0);
@@ -277,14 +273,28 @@ void CRenderMeshMerger::MakeListOfAllCRenderChunks(SMergeInfo& info)
 			assert((int)pSrcInds[i + 0] >= newMatInfo.nFirstVertId && pSrcInds[i + 0] < newMatInfo.nFirstVertId + newMatInfo.nNumVerts);
 			assert((int)pSrcInds[i + 1] >= newMatInfo.nFirstVertId && pSrcInds[i + 1] < newMatInfo.nFirstVertId + newMatInfo.nNumVerts);
 			assert((int)pSrcInds[i + 2] >= newMatInfo.nFirstVertId && pSrcInds[i + 2] < newMatInfo.nFirstVertId + newMatInfo.nNumVerts);
-
+			
 			// skip not needed triangles for decals
 			if (fOSRadius)
 			{
 				// get verts
-				Vec3 v0 = pPos[nPosStride * pSrcInds[i + 0]];
-				Vec3 v1 = pPos[nPosStride * pSrcInds[i + 1]];
-				Vec3 v2 = pPos[nPosStride * pSrcInds[i + 2]];
+				Vec3 v0;
+				Vec3 v1;
+				Vec3 v2;
+
+				if (pGeneralF32)
+				{
+					v0 = pGeneralF32[pSrcInds[i + 0]].xyz;
+					v1 = pGeneralF32[pSrcInds[i + 1]].xyz;
+					v2 = pGeneralF32[pSrcInds[i + 2]].xyz;
+				}
+
+				if (pGeneralF16)
+				{
+					v0 = pGeneralF16[pSrcInds[i + 0]].xyz.ToVec3();
+					v1 = pGeneralF16[pSrcInds[i + 1]].xyz.ToVec3();
+					v2 = pGeneralF16[pSrcInds[i + 2]].xyz.ToVec3();
+				}
 
 				if (vOSProjDir.IsZero())
 				{
@@ -320,9 +330,27 @@ void CRenderMeshMerger::MakeListOfAllCRenderChunks(SMergeInfo& info)
 			else if (info.pClipCellBox)
 			{
 				// get verts
-				Vec3 v0 = pRMI->mat.TransformPoint(pPos[nPosStride * pSrcInds[i + 0]]);
-				Vec3 v1 = pRMI->mat.TransformPoint(pPos[nPosStride * pSrcInds[i + 1]]);
-				Vec3 v2 = pRMI->mat.TransformPoint(pPos[nPosStride * pSrcInds[i + 2]]);
+				Vec3 v0;
+				Vec3 v1;
+				Vec3 v2;
+
+				if (pGeneralF32)
+				{
+					v0 = pGeneralF32[pSrcInds[i + 0]].xyz;
+					v1 = pGeneralF32[pSrcInds[i + 1]].xyz;
+					v2 = pGeneralF32[pSrcInds[i + 2]].xyz;
+				}
+
+				if (pGeneralF16)
+				{
+					v0 = pGeneralF16[pSrcInds[i + 0]].xyz.ToVec3();
+					v1 = pGeneralF16[pSrcInds[i + 1]].xyz.ToVec3();
+					v2 = pGeneralF16[pSrcInds[i + 2]].xyz.ToVec3();
+				}
+
+				v0 = pRMI->mat.TransformPoint(v0);
+				v1 = pRMI->mat.TransformPoint(v1);
+				v2 = pRMI->mat.TransformPoint(v2);
 
 				if (!Overlap::AABB_Triangle(*info.pClipCellBox, v0, v1, v2))
 					continue;
@@ -340,63 +368,103 @@ void CRenderMeshMerger::MakeListOfAllCRenderChunks(SMergeInfo& info)
 			continue;
 
 		// add vertices
-		for (int v = newMatInfo.nFirstVertId; v < (int)newMatInfo.nFirstVertId + (int)newMatInfo.nNumVerts; v++)
+		if (pGeneralF32)
 		{
-			assert(v >= 0 && v < pRM->GetVerticesCount());
-
-			SVF_P3H_C4B_T2H vert;
-
-			// set pos
-			Vec3 vPos = pPos[nPosStride * v];
-			vPos = pRMI->mat.TransformPoint(vPos);
-			vert.xyz = vPos - info.vResultOffset;
-
-			// set uv
-			if (pTex)
+			for (int v = newMatInfo.nFirstVertId; v < (int)newMatInfo.nFirstVertId + (int)newMatInfo.nNumVerts; v++)
 			{
-				vert.st = pTex[nTexStride * v];
+				assert(v >= 0 && v < pRM->GetVerticesCount());
+				Vec3 vPos32 = pRMI->mat.TransformPoint(pGeneralF32[v].xyz);
+
+				// set vertex
+				SVF_P3H_C4B_T2H vert;
+
+				vert.xyz = vPos32 - info.vResultOffset;
+				vert.color = pGeneralF32[v].color;
+				vert.st = pGeneralF32[v].st;
+
+				m_lstVerts.Add(vert);
+			}
+		}
+
+		if (pGeneralF16)
+		{
+			for (int v = newMatInfo.nFirstVertId; v < (int)newMatInfo.nFirstVertId + (int)newMatInfo.nNumVerts; v++)
+			{
+				assert(v >= 0 && v < pRM->GetVerticesCount());
+				Vec3 vPos32 = pRMI->mat.TransformPoint(pGeneralF16[v].xyz.ToVec3());
+
+				// set vertex
+				SVF_P3H_C4B_T2H vert;
+
+				vert.xyz = vPos32 - info.vResultOffset;
+				vert.color = pGeneralF16[v].color;
+				vert.st = pGeneralF16[v].st;
+
+				m_lstVerts.Add(vert);
+			}
+		}
+
+		// add tangent basis
+		if (pTangs)
+		{
+			if (bMatrixHasRotation)
+			{
+				for (int v = newMatInfo.nFirstVertId; v < (int)newMatInfo.nFirstVertId + (int)newMatInfo.nNumVerts; v++)
+				{
+					SPipTangents basis = pTangs[v];
+					basis.TransformSafelyBy(pRMI->mat);
+					m_lstTangBasises.Add(basis);
+				}
 			}
 			else
 			{
-				vert.st = Vec2f16(0, 0);
-			}
-
-			vert.color = pColor[nColorStride * v + 0];
-
-			m_lstVerts.Add(vert);
-
-			// get tangent basis + normal
-			SPipTangents basis = SPipTangents(Vec4i16(0, 0, 0, 0), Vec4i16(0, 0, 0, 0));
-			SPipNormal normal = SPipNormal(Vec4i16(0, 0, 0, 0));
-
-			assert((pTangs) || (!pNorm));
-			if (pTangs)
-			{
-				basis = *(SPipTangents*)&pTangs[nTangsStride * v];
-#if ENABLE_NORMALSTREAM_SUPPORT
-				if (pNorm)
+				for (int v = newMatInfo.nFirstVertId; v < (int)newMatInfo.nFirstVertId + (int)newMatInfo.nNumVerts; v++)
 				{
-					normal = *(SPipNormal*)&pNorm[nNormStride * v];
-				}
-#endif
-
-				if (bMatrixHasRotation)
-				{
-					basis.TransformSafelyBy(pRMI->mat);
-#if ENABLE_NORMALSTREAM_SUPPORT
-					if (pNorm)
-					{
-						normal.TransformSafelyBy(pRMI->mat);
-					}
-#endif
+					SPipTangents basis = pTangs[v];
+					m_lstTangBasises.Add(basis);
 				}
 			}
-
-			m_lstTangBasises.Add(basis);
-#if ENABLE_NORMALSTREAM_SUPPORT
-			m_lstNormals.Add(normal);
-#endif
 		}
+		else
+		{
+			for (int v = newMatInfo.nFirstVertId; v < (int)newMatInfo.nFirstVertId + (int)newMatInfo.nNumVerts; v++)
+			{
+				SPipTangents basis = SPipTangents(Vec4i16(0, 0, 0, 0), Vec4i16(0, 0, 0, 0), 0);
+				m_lstTangBasises.Add(basis);
+			}
+		}
+
+#if ENABLE_NORMALSTREAM_SUPPORT
+		// add normals
+		if (pNorm)
+		{
+			if (bMatrixHasRotation)
+			{
+				for (int v = newMatInfo.nFirstVertId; v < (int)newMatInfo.nFirstVertId + (int)newMatInfo.nNumVerts; v++)
+				{
+					SPipNormal normal = pNorm[v];
+					normal.TransformSafelyBy(pRMI->mat);
+					m_lstNormals.Add(normal);
+				}
+			}
+			else
+			{
+				for (int v = newMatInfo.nFirstVertId; v < (int)newMatInfo.nFirstVertId + (int)newMatInfo.nNumVerts; v++)
+				{
+					SPipNormal normal = pNorm[v];
+					m_lstNormals.Add(normal);
+				}
+			}
+		}
+		else
+		{
+			for (int v = newMatInfo.nFirstVertId; v < (int)newMatInfo.nFirstVertId + (int)newMatInfo.nNumVerts; v++)
+			{
+				SPipNormal normal = SPipNormal(Vec4i16(0, 0, 0, 0));
+				m_lstNormals.Add(normal);
+			}
+		}
+#endif
 
 		// set vert range
 		newMatInfo.nFirstVertId = m_lstVerts.Count() - newMatInfo.nNumVerts;
@@ -977,7 +1045,7 @@ _smart_ptr<IRenderMesh> CRenderMeshMerger::MergeRenderMeshes(SRenderMeshInfoInpu
 	m_lstNewVerts.reserve(m_nTotalVertexCount);
 	m_lstNewTangBasises.reserve(m_nTotalVertexCount);
 #if ENABLE_NORMALSTREAM_SUPPORT
-	m_lstNormals.reserve(m_nTotalVertexCount);
+	m_lstNewNormals.reserve(m_nTotalVertexCount);
 #endif
 	m_lstNewIndices.reserve(m_nTotalIndexCount);
 
@@ -989,7 +1057,7 @@ _smart_ptr<IRenderMesh> CRenderMeshMerger::MergeRenderMeshes(SRenderMeshInfoInpu
 		m_lstNewVerts.clear();
 		m_lstNewTangBasises.clear();
 #if ENABLE_NORMALSTREAM_SUPPORT
-		m_lstNormals.clear();
+		m_lstNewNormals.clear();
 #endif
 		m_lstNewIndices.clear();
 		m_lstNewChunks.clear();
@@ -1010,7 +1078,7 @@ _smart_ptr<IRenderMesh> CRenderMeshMerger::MergeRenderMeshes(SRenderMeshInfoInpu
 			m_lstNewVerts.AddList(&m_lstVerts[Ch.nFirstVertId], Ch.nNumVerts);
 			m_lstNewTangBasises.AddList(&m_lstTangBasises[Ch.nFirstVertId], Ch.nNumVerts);
 #if ENABLE_NORMALSTREAM_SUPPORT
-			m_lstNormals.AddList(&m_lstNormals[Ch.nFirstVertId], Ch.nNumVerts);
+			m_lstNewNormals.AddList(&m_lstNormals[Ch.nFirstVertId], Ch.nNumVerts);
 #endif
 
 			for (uint32 i = Ch.nFirstIndexId; i < Ch.nFirstIndexId + Ch.nNumIndices; i++)
@@ -1340,16 +1408,22 @@ void CRenderMeshMerger::MergeBuffers(AABB& bounds)
 	{
 		SMergeBuffersData& rMergeBufferData = m_lstMergeBuffersData[nChunk];
 		IRenderMesh* pRM = allChunks[nChunk].pFromMesh->pMesh;
-		pRM->LockForThreadAccess();
-		rMergeBufferData.pPos = pRM->GetPosPtr(rMergeBufferData.nPosStride, FSL_READ);
-		rMergeBufferData.pTex = pRM->GetUVPtr(rMergeBufferData.nTexStride, FSL_READ);
-		rMergeBufferData.pColor = pRM->GetColorPtr(rMergeBufferData.nColorStride, FSL_READ);
-		rMergeBufferData.pTangs = pRM->GetTangentPtr(rMergeBufferData.nTangsStride, FSL_READ);
-		rMergeBufferData.nIndCount = pRM->GetIndicesCount();
-		rMergeBufferData.pSrcInds = pRM->GetIndexPtr(FSL_READ);
 
+		pRM->LockForThreadAccess();
+
+		rMergeBufferData.nIndCount = pRM->GetIndicesCount();
+		rMergeBufferData.pSrcInds = pRM->GetIndices(FSL_READ);
+		
+		if (pRM->GetVertexFormat() == EDefaultInputLayouts::P3F_C4B_T2F)
+			rMergeBufferData.pGeneralF32 = pRM->GetGenerals(FSL_READ);
+		else if (pRM->GetVertexFormat() == EDefaultInputLayouts::P3H_C4B_T2H)
+			rMergeBufferData.pGeneralF16 = pRM->GetGeneralsF16(FSL_READ);
+		else
+			CRY_ASSERT(false);
+
+		rMergeBufferData.pTangents = pRM->GetTangents(FSL_READ);
 #if ENABLE_NORMALSTREAM_SUPPORT
-		rMergeBufferData.pNorm = pRM->GetNormPtr(rMergeBufferData.nNormStride, FSL_READ);
+		rMergeBufferData.pNormals = pRM->GetNormals(FSL_READ);
 #endif
 	}
 
@@ -1376,14 +1450,12 @@ void CRenderMeshMerger::MergeBuffersImpl(AABB* pBounds, SMergeBuffersData* _arrM
 	PodArray<vtx_idx>& arrIndices = m_lstNewIndices;
 	PodArray<SVF_P3H_C4B_T2H>& arrVertices = m_lstVerts;
 	PodArray<SPipTangents>& arrTangents = m_lstTangBasises;
-
 #if ENABLE_NORMALSTREAM_SUPPORT
 	PodArray<SPipNormal>& arrNormals = m_lstNormals;
 #endif
 
 	for (size_t nChunk = 0; nChunk < nNumMergeChunks; nChunk++)
 	{
-
 		SMergedChunk& renderChunk = allChunks[nChunk];
 		SMergeBuffersData& rMergeBufferData = arrMergeBuffersData[nChunk];
 		SRenderMeshInfoInput* pRMI = renderChunk.pFromMesh;
@@ -1400,22 +1472,14 @@ void CRenderMeshMerger::MergeBuffersImpl(AABB* pBounds, SMergeBuffersData* _arrM
 		IRenderMesh* pRM = pRMI->pMesh;
 
 		// get streams.
-		int nPosStride = rMergeBufferData.nPosStride;
-		int nTexStride = rMergeBufferData.nTexStride;
-		int nColorStride = rMergeBufferData.nColorStride;
-		int nTangsStride = rMergeBufferData.nTangsStride;
-
-		uint8* pPos = rMergeBufferData.pPos;
-		uint8* pTex = rMergeBufferData.pTex;
-		uint8* pColor = rMergeBufferData.pColor;
-		uint8* pTangs = rMergeBufferData.pTangs;
-
+		const auto pGeneralF32 = rMergeBufferData.pGeneralF32;
+		const auto pGeneralF16 = rMergeBufferData.pGeneralF16;
+		const auto pTangents = rMergeBufferData.pTangents;
 #if ENABLE_NORMALSTREAM_SUPPORT
-		int nNormStride = rMergeBufferData.nNormStride;
-		uint8* pNorm = rMergeBufferData.pNorm;
+		const auto pNormals = rMergeBufferData.pNormals;
 #endif
 
-		if (!pPos || !pTex || !pColor || !pTangs)
+		if ((!pGeneralF32 && !pGeneralF16) || (!pTangents && !pNormals))
 		{
 			assert(0); // Should not happen.
 			continue;
@@ -1461,112 +1525,88 @@ void CRenderMeshMerger::MergeBuffersImpl(AABB* pBounds, SMergeBuffersData* _arrM
 		// add vertices
 		//////////////////////////////////////////////////////////////////////////
 		int nCurrVertex = nLastVertex;
+
+		// TODO: prevents redundant allocation of tangent-frames and normals when not used
 		arrVertices.resize(nLastVertex + renderChunk.rChunk.nNumVerts);
 		arrTangents.resize(nLastVertex + renderChunk.rChunk.nNumVerts);
-
 #if ENABLE_NORMALSTREAM_SUPPORT
 		arrNormals.resize(nLastVertex + renderChunk.rChunk.nNumVerts);
 #endif
 
 		int v = renderChunk.rChunk.nFirstVertId;
 		int numVert = renderChunk.rChunk.nFirstVertId + renderChunk.rChunk.nNumVerts;
-		if (bMatrixHasRotation)
-		{
-			SVF_P3H_C4B_T2H* __restrict pDstVerts = &arrVertices[0];
-			SPipTangents* __restrict pDstTangs = &arrTangents[0];
-#if ENABLE_NORMALSTREAM_SUPPORT
-			SPipNormal* __restrict pDstNorms = &arrNormals[0];
-#endif
 
-			uint8* pSrcPos = pPos;
-			uint8* pSrcTex = pTex;
-			uint8* pSrcColor = pColor;
-			uint8* pSrcTangs = pTangs;
-#if ENABLE_NORMALSTREAM_SUPPORT
-			uint8* pSrcNorm = pNorm;
-#endif
-			for (; v < numVert; v++, nCurrVertex++)
+		SVF_P3H_C4B_T2H* __restrict pDstVerts = &arrVertices[0];
+		if (const auto pSrcGeneralF32 = pGeneralF32)
+		{
+			for (nCurrVertex = nLastVertex; v < numVert; v++, nCurrVertex++)
 			{
 				SVF_P3H_C4B_T2H& vert = pDstVerts[nCurrVertex];
-				SPipTangents& basis = pDstTangs[nCurrVertex];
-#if ENABLE_NORMALSTREAM_SUPPORT
-				SPipNormal& normal = pDstNorms[nCurrVertex];
-#endif
+
 				// set pos/uv
-				Vec3& vPos = (*(Vec3*)&pSrcPos[nPosStride * v]);
-				Vec2* pUV = (Vec2*)&pSrcTex[nTexStride * v];
+				vert.xyz   = rMatrix.TransformPoint(pSrcGeneralF32[v].xyz);
+				vert.color = pSrcGeneralF32[v].color;
+				vert.st    = pSrcGeneralF32[v].st;
+			}
+		}
+		else if (const auto pSrcGeneralF16 = pGeneralF16)
+		{
+			for (nCurrVertex = nLastVertex; v < numVert; v++, nCurrVertex++)
+			{
+				SVF_P3H_C4B_T2H& vert = pDstVerts[nCurrVertex];
 
-				vert.xyz = rMatrix.TransformPoint(vPos);
-				vert.st = *pUV;
-				vert.color.dcolor = *(uint32*)&pSrcColor[nColorStride * v + 0];
+				// set pos/uv
+				vert.xyz   = rMatrix.TransformPoint(pGeneralF16[v].xyz.ToVec3());
+				vert.color = pGeneralF16[v].color;
+				vert.st    = pGeneralF16[v].st;
+			}
+		}
 
-				// get tangent basis
-				basis = *(SPipTangents*)&pSrcTangs[nTangsStride * v];
-
-#if ENABLE_NORMALSTREAM_SUPPORT
-				normal = SPipNormal(Vec4i16(0, 0, 0, 0));
-				if (pSrcNorm)
+		// set tangent basis
+		SPipTangents* __restrict pDstTangs = &arrTangents[0];
+		if (const auto pSrcTangs = pTangents)
+		{
+			if (bMatrixHasRotation)
+			{
+				for (nCurrVertex = nLastVertex; v < numVert; v++, nCurrVertex++)
 				{
-					normal = *(SPipNormal*)&pSrcNorm[nNormStride * v];
-				}
-#endif
-
-				if (bMatrixHasRotation)
-				{
+					SPipTangents& basis = pDstTangs[nCurrVertex];
 					basis.TransformSafelyBy(rMatrix);
-#if ENABLE_NORMALSTREAM_SUPPORT
-					if (pSrcNorm)
-					{
-						normal.TransformSafelyBy(rMatrix);
-					}
-#endif
 				}
 			}
 		}
 		else
 		{
-			SVF_P3H_C4B_T2H* __restrict pDstVerts = &arrVertices[0];
-			SPipTangents* __restrict pDstTangs = &arrTangents[0];
-#if ENABLE_NORMALSTREAM_SUPPORT
-			SPipNormal* __restrict pDstNorms = &arrNormals[0];
-#endif
-
-			uint8* pSrcPos = pPos;
-			uint8* pSrcTex = pTex;
-			uint8* pSrcColor = pColor;
-			uint8* pSrcTangs = pTangs;
-#if ENABLE_NORMALSTREAM_SUPPORT
-			uint8* pSrcNorm = pNorm;
-#endif
-			for (; v < numVert; v++, nCurrVertex++)
+			for (nCurrVertex = nLastVertex; v < numVert; v++, nCurrVertex++)
 			{
-				SVF_P3H_C4B_T2H& vert = pDstVerts[nCurrVertex];
 				SPipTangents& basis = pDstTangs[nCurrVertex];
-
-#if ENABLE_NORMALSTREAM_SUPPORT
-				SPipNormal& normal = pDstNorms[nCurrVertex];
-#endif
-
-				// set pos/uv
-				Vec3& vPos = (*(Vec3*)&pSrcPos[nPosStride * v]);
-				Vec2* pUV = (Vec2*)&pSrcTex[nTexStride * v];
-
-				vert.xyz = rMatrix.TransformPoint(vPos);
-				vert.st = *pUV;
-				vert.color.dcolor = *(uint32*)&pSrcColor[nColorStride * v];
-
-				// get tangent basis
-				basis = *(SPipTangents*)&pSrcTangs[nTangsStride * v];
-
-#if ENABLE_NORMALSTREAM_SUPPORT
-				normal = SPipNormal(Vec4i16(0, 0, 0, 0));
-				if (pSrcNorm)
-				{
-					normal = *(SPipNormal*)(&pSrcNorm[nNormStride * v]);
-				}
-#endif
+				basis = SPipTangents(Vec4i16(0, 0, 0, 0), Vec4i16(0, 0, 0, 0), 0);
 			}
 		}
+
+#if ENABLE_NORMALSTREAM_SUPPORT
+		// set normals
+		SPipNormal* __restrict pDstNorms = &arrNormals[0];
+		if (const auto pSrcNorm = pNormals)
+		{
+			if (bMatrixHasRotation)
+			{
+				for (nCurrVertex = nLastVertex; v < numVert; v++, nCurrVertex++)
+				{
+					SPipNormal& normal = pDstNorms[nCurrVertex];
+					normal.TransformSafelyBy(rMatrix);
+				}
+			}
+		}
+		else
+		{
+			for (nCurrVertex = nLastVertex; v < numVert; v++, nCurrVertex++)
+			{
+				SPipNormal& normal = pDstNorms[nCurrVertex];
+				normal = SPipNormal(Vec4i16(0, 0, 0, 0));
+			}
+		}
+#endif
 
 		// set vert range
 		renderChunk.rChunk.nFirstVertId = nLastVertex;

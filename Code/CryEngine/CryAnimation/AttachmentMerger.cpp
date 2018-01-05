@@ -45,12 +45,27 @@ CAttachmentMerger::MeshStreams::MeshStreams(IRenderMesh* pRenderMesh, uint32 loc
 	, pSkinningInfos(NULL)
 {
 	pRenderMesh->LockForThreadAccess();
+	pIndices = pRenderMesh->GetIndices(lockFlags);
+	
+	InputLayoutHandle sVF = pRenderMesh->GetVertexFormat();
+	if (sVF == EDefaultInputLayouts::P3F_C4B_T2F || sVF == EDefaultInputLayouts::P3F)
+	{
+		auto _pPositions = pRenderMesh->GetPositions(lockFlags);
 
-	pIndices = pRenderMesh->GetIndexPtr(lockFlags);
-	pPositions = pRenderMesh->GetPosPtrNoCache(nPositionStride, lockFlags);
+		pPositions.data = reinterpret_cast<byte*>(_pPositions.data);
+		pPositions.iStride = _pPositions.iStride;
+	}
+
+	if (sVF == EDefaultInputLayouts::P3H_C4B_T2H || sVF == EDefaultInputLayouts::P3H)
+	{
+		auto _pPositions = pRenderMesh->GetPositionsF16(lockFlags);
+
+		pPositions.data = reinterpret_cast<byte*>(_pPositions.data);
+		pPositions.iStride = _pPositions.iStride;
+	}
 
 	if (bGetSkinningInfos)
-		pSkinningInfos = pRenderMesh->GetHWSkinPtr(nSkinningInfoStride, lockFlags);
+		pSkinningInfos = pRenderMesh->GetHWSkinWeights(lockFlags);
 }
 
 CAttachmentMerger::MeshStreams::~MeshStreams()
@@ -64,7 +79,7 @@ CAttachmentMerger::MeshStreams::~MeshStreams()
 SVF_W4B_I4U& CAttachmentMerger::MeshStreams::GetSkinningInfo(vtx_idx nVtxIndex)
 {
 	CRY_ASSERT(nVtxIndex < pMesh->GetVerticesCount());
-	return static_cast<SVF_W4B_I4U*>(pSkinningInfos)[nVtxIndex];
+	return pSkinningInfos[nVtxIndex];
 }
 
 vtx_idx& CAttachmentMerger::MeshStreams::GetVertexIndex(int i)
@@ -377,25 +392,25 @@ void CAttachmentMerger::OnDeleteMergedAttachment(CAttachmentMerged* pAttachment)
 inline Vec3 toVec3(const Vec3& v)    { return v; }
 inline Vec3 toVec3(const Vec3f16& v) { return v.ToVec3(); }
 
-template<typename VertexFormat, const bool RequiresTransform>
+template<typename SrcVertexFormat, typename DstVertexFormat, const bool RequiresTransform>
 void CopyVertices_tpl(CAttachmentMerger::MeshStreams& dstStreams, uint dstVtxOffset, CAttachmentMerger::MeshStreams& srcStreams, uint numVertices, const Matrix34& transform)
 {
-	const uint8_t* __restrict pSrc = (uint8_t*) srcStreams.pPositions;
-	const uint8_t* pSrcEnd = pSrc + numVertices * srcStreams.nPositionStride;
+	const uint8_t* __restrict pSrc = srcStreams.pPositions.data;
+	const uint8_t* pSrcEnd = pSrc + numVertices * srcStreams.pPositions.iStride;
 
-	uint8_t* __restrict pDst = (uint8_t*) dstStreams.pPositions + dstVtxOffset * dstStreams.nPositionStride;
+	uint8_t* __restrict pDst = dstStreams.pPositions.data + dstVtxOffset * dstStreams.pPositions.iStride;
 
 	while (pSrc < pSrcEnd)
 	{
-		Vec3 v = toVec3(((VertexFormat*) pSrc)->xyz);
+		Vec3 v = toVec3(reinterpret_cast<const SrcVertexFormat* __restrict>(pSrc)->xyz);
 
 		if (RequiresTransform)
 			v = transform * v;
 
-		((SVF_P3F*) pDst)->xyz = v;
+		reinterpret_cast<DstVertexFormat* __restrict>(pDst)->xyz = v;
 
-		pDst += dstStreams.nPositionStride;
-		pSrc += srcStreams.nPositionStride;
+		pDst += dstStreams.pPositions.iStride;
+		pSrc += srcStreams.pPositions.iStride;
 	}
 }
 
@@ -403,13 +418,25 @@ template<const bool RequiresTransform>
 uint CopyVertices(CAttachmentMerger::MeshStreams& dstStreams, uint dstVtxOffset, CAttachmentMerger::MeshStreams& srcStreams, uint numVertices, const Matrix34& transform)
 {
 	InputLayoutHandle sVF = srcStreams.GetVertexFormat();
+	InputLayoutHandle dVF = dstStreams.GetVertexFormat();
 
-	if (sVF == EDefaultInputLayouts::P3H_C4B_T2H)
-		CopyVertices_tpl<SVF_P3H_C4B_T2H, RequiresTransform>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
-	else if (sVF == EDefaultInputLayouts::P3F_C4B_T2F)
-		CopyVertices_tpl<SVF_P3F_C4B_T2F, RequiresTransform>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
-	else if (sVF == EDefaultInputLayouts::P3F)
-		CopyVertices_tpl<SVF_P3F, RequiresTransform>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
+	// Choose not to down-grade position-precision if any one attachment is high precision
+	if (sVF == EDefaultInputLayouts::P3F_C4B_T2F && dVF == EDefaultInputLayouts::P3F)
+		CopyVertices_tpl<SVF_P3F_C4B_T2F, SVF_P3F, RequiresTransform>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
+//	else if (sVF == EDefaultInputLayouts::P3F_C4B_T2F && dVF == EDefaultInputLayouts::P3H)
+//		CopyVertices_tpl<SVF_P3F_C4B_T2F, SVF_P3H, RequiresTransform>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
+	else if (sVF == EDefaultInputLayouts::P3H_C4B_T2H && dVF == EDefaultInputLayouts::P3F)
+		CopyVertices_tpl<SVF_P3H_C4B_T2H, SVF_P3F, RequiresTransform>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
+	else if (sVF == EDefaultInputLayouts::P3H_C4B_T2H && dVF == EDefaultInputLayouts::P3H)
+		CopyVertices_tpl<SVF_P3H_C4B_T2H, SVF_P3H, RequiresTransform>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
+	else if (sVF == EDefaultInputLayouts::P3F && dVF == EDefaultInputLayouts::P3F)
+		CopyVertices_tpl<SVF_P3F, SVF_P3F, RequiresTransform>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
+//	else if (sVF == EDefaultInputLayouts::P3F && dVF == EDefaultInputLayouts::P3H)
+//		CopyVertices_tpl<SVF_P3F, SVF_P3H, RequiresTransform>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
+	else if (sVF == EDefaultInputLayouts::P3H && dVF == EDefaultInputLayouts::P3F)
+		CopyVertices_tpl<SVF_P3H, SVF_P3F, RequiresTransform>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
+	else if (sVF == EDefaultInputLayouts::P3H && dVF == EDefaultInputLayouts::P3H)
+		CopyVertices_tpl<SVF_P3H, SVF_P3H, RequiresTransform>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
 	else
 		CRY_ASSERT(false);
 
@@ -423,6 +450,47 @@ uint CAttachmentMerger::CopyVertices(MeshStreams& dstStreams, uint dstVtxOffset,
 uint CAttachmentMerger::CopyVertices(MeshStreams& dstStreams, uint dstVtxOffset, MeshStreams& srcStreams, uint numVertices, const Matrix34& transform)
 {
 	return ::CopyVertices<true>(dstStreams, dstVtxOffset, srcStreams, numVertices, transform);
+}
+
+void CAttachmentMerger::CopyIndices(MeshStreams& dstStreams, uint dstVtxOffset, uint dstIdxOffset, MeshStreams& srcStreams)
+{
+#if defined(CRY_PLATFORM_SSE2)
+	memcpy(dstStreams.pIndices + dstIdxOffset, srcStreams.pIndices + 0, srcStreams.pMesh->GetIndicesCount() * sizeof(vtx_idx));
+
+	const bool b32BitIndices = sizeof(vtx_idx) == 4;
+	const uint NumElementsSSE = b32BitIndices ? 4 : 8;
+
+	__m128i dstIdxOffset4 = b32BitIndices ? _mm_set1_epi32(dstVtxOffset) : _mm_set1_epi16(dstVtxOffset);
+
+	vtx_idx* pDstStart = dstStreams.pIndices + dstIdxOffset;
+	vtx_idx* pDstEnd = dstStreams.pIndices + dstIdxOffset + srcStreams.pMesh->GetIndicesCount();
+
+	vtx_idx* pDstStartAligned = Align(pDstStart, 16);
+	vtx_idx* pDstEndAligned = pDstStart + (srcStreams.pMesh->GetIndicesCount() & ~(NumElementsSSE - 1));
+
+	vtx_idx* __restrict pCur = pDstStart;
+
+	while (pCur < pDstStartAligned)
+		*pCur++ += dstVtxOffset;
+
+	for (; pCur < pDstEndAligned; pCur += NumElementsSSE)
+	{
+		__m128i v = _mm_load_si128((__m128i*)pCur);
+		__m128i w = b32BitIndices ? _mm_add_epi32(v, dstIdxOffset4) : _mm_add_epi16(v, dstIdxOffset4);
+		_mm_storeu_si128((__m128i*)pCur, w);
+	}
+
+	while (pCur < pDstEnd)
+		*pCur++ += dstVtxOffset;
+
+#else
+	for (uint k = 0, n = srcStreams.pMesh->GetIndicesCount(); k < n; ++k)
+	{
+		vtx_idx idxSrc = srcStreams.GetVertexIndex(0 + k);
+		vtx_idx& idxDst = dstStreams.GetVertexIndex(dstIdxOffset + k);
+		idxDst = idxSrc + dstVtxOffset;
+	}
+#endif
 }
 
 uint CAttachmentMerger::CopyIndices(MeshStreams& dstStreams, uint dstVtxOffset, uint dstIdxOffset, MeshStreams& srcStreams, const CRenderChunk& chunk)
@@ -465,6 +533,16 @@ uint CAttachmentMerger::CopyIndices(MeshStreams& dstStreams, uint dstVtxOffset, 
 	}
 #endif
 	return chunk.nNumIndices;
+}
+
+void CAttachmentMerger::CopySkinning(MeshStreams& dstStreams, uint dstVtxOffset, MeshStreams& srcStreams, uint numVertices)
+{
+	CRY_ASSERT(srcStreams.pSkinningInfos);
+
+	for (uint k = 0; k < numVertices; ++k)
+	{
+		dstStreams.GetSkinningInfo(k + dstVtxOffset) = srcStreams.GetSkinningInfo(k);
+	}
 }
 
 uint CAttachmentMerger::CopySkinning(MeshStreams& dstStreams, uint dstVtxOffset, MeshStreams& srcStreams, uint numVertices, const DynArray<JointIdType>& boneIDs)
@@ -551,6 +629,7 @@ void CAttachmentMerger::Merge(CAttachmentMerged* pDstAttachment, const DynArray<
 		IRenderMesh* pPrevRenderMesh = pDstSkin->GetIRenderMesh(lod);
 
 		// Create rendermesh
+		InputLayoutHandle targetVF = pPrevRenderMesh ? pPrevRenderMesh->GetVertexFormat() : EDefaultInputLayouts::P3H_C4B_T2H;
 		uint numVertices = pPrevRenderMesh ? pPrevRenderMesh->GetVerticesCount() : 0;
 		uint numIndices = pPrevRenderMesh ? pPrevRenderMesh->GetIndicesCount() : 0;
 
@@ -562,12 +641,22 @@ void CAttachmentMerger::Merge(CAttachmentMerged* pDstAttachment, const DynArray<
 				numIndices += chunk.nNumIndices;
 
 			numVertices += lodData.pMesh->GetVerticesCount();
+
+			// Choose not to down-grade position-precision if any one attachment is high precision
+			const InputLayoutHandle sVF = lodData.pMesh->GetVertexFormat();
+			if (sVF == EDefaultInputLayouts::P3F_C4B_T2F)
+				targetVF = EDefaultInputLayouts::P3F_C4B_T2F;
 		}
 
 		IRenderMesh::SInitParamerers params;
 		params.nVertexCount = numVertices;
 		params.nIndexCount = numIndices;
-		params.eVertexFormat = TargetVertexFormat;
+		if (targetVF == EDefaultInputLayouts::P3F_C4B_T2F || targetVF == EDefaultInputLayouts::P3F)
+			params.eVertexFormat = EDefaultInputLayouts::P3F;
+		else if (targetVF == EDefaultInputLayouts::P3H_C4B_T2H || targetVF == EDefaultInputLayouts::P3H)
+			params.eVertexFormat = EDefaultInputLayouts::P3H;
+		else
+			CRY_ASSERT(false);
 
 		_smart_ptr<IRenderMesh> pRenderMesh = g_pISystem->GetIRenderer()->CreateRenderMesh("MergedCharacter", pDstAttachment->m_pMergedSkinAttachment->GetName(), &params);
 
@@ -584,9 +673,10 @@ void CAttachmentMerger::Merge(CAttachmentMerged* pDstAttachment, const DynArray<
 			if (pPrevRenderMesh)
 			{
 				MeshStreams srcStreams(pPrevRenderMesh);
-				memcpy(dstStreams.pPositions, srcStreams.pPositions, pPrevRenderMesh->GetVerticesCount() * srcStreams.nPositionStride);
-				memcpy(dstStreams.pSkinningInfos, srcStreams.pSkinningInfos, pPrevRenderMesh->GetVerticesCount() * srcStreams.nSkinningInfoStride);
-				memcpy(dstStreams.pIndices, srcStreams.pIndices, pPrevRenderMesh->GetIndicesCount() * sizeof(srcStreams.pIndices[0]));
+
+				CopyVertices(dstStreams, 0, srcStreams, pPrevRenderMesh->GetVerticesCount());
+				CopySkinning(dstStreams, 0, srcStreams, pPrevRenderMesh->GetVerticesCount());
+				CopyIndices(dstStreams, 0, 0, srcStreams/*, pPrevRenderMesh->GetIndicesCount()*/);
 
 				vertexBase = pPrevRenderMesh->GetVerticesCount();
 				indexBase = pPrevRenderMesh->GetIndicesCount();

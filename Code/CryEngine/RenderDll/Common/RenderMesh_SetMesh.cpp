@@ -28,7 +28,7 @@ void CompactPositions(T* pVBuff, SSetMeshIntData& data, CMesh& mesh, const Vec3&
 {
 	if (mesh.m_pPositionsF16)
 		for (size_t i = 0; i < end; ++i)
-			pVBuff[i].xyz = mesh.m_pPositionsF16[beg + i];
+			pVBuff[i].xyz = mesh.m_pPositionsF16[beg + i].ToVec3() - posOffset;
 	else
 		for (size_t i = 0; i < end; ++i)
 			pVBuff[i].xyz = mesh.m_pPositions[beg + i] - posOffset;
@@ -39,7 +39,7 @@ void CompactPositions(SVF_P3F_C4B_T2F* pVBuff, SSetMeshIntData& data, CMesh& mes
 {
 	if (mesh.m_pPositionsF16)
 		for (size_t i = 0; i < end; ++i)
-			pVBuff[i].xyz = mesh.m_pPositionsF16[beg + i].ToVec3();
+			pVBuff[i].xyz = mesh.m_pPositionsF16[beg + i].ToVec3() - posOffset;
 	else
 		for (size_t i = 0; i < end; ++i)
 			pVBuff[i].xyz = mesh.m_pPositions[beg + i] - posOffset;

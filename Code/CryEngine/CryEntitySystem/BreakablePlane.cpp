@@ -667,10 +667,9 @@ void         CBreakablePlane::ExtractMeshIsland(const SExtractMeshIslandIn& in, 
 
 		IRenderMesh::ThreadAccessLock lockrm(pRndMesh);
 
-		strided_pointer<Vec3> pVtx;
-		pVtx.data = (Vec3*)pRndMesh->GetPosPtr(pVtx.iStride, FSL_READ);
-		vtx_idx* pIdx = pRndMesh->GetIndexPtr(FSL_SYSTEM_UPDATE);
-		if (!pIdx || !pVtx.data)
+		const auto pVtx = pRndMesh->GetPositions(FSL_READ);
+		auto pIdx = pRndMesh->GetIndices(FSL_SYSTEM_UPDATE);
+		if (!pIdx || !pVtx)
 			return;
 
 		// Determine which polys are the island
@@ -737,19 +736,17 @@ void         CBreakablePlane::ExtractMeshIsland(const SExtractMeshIslandIn& in, 
 			pIdxMesh->SetVertexCount(ivtxMax - ivtxMin + 1);
 			pIdxMesh->SetTexCoordCount(ivtxMax - ivtxMin + 1);
 			pIdxMesh->SetTangentCount(ivtxMax - ivtxMin + 1);
-			strided_pointer<Vec2> pTex;
-			strided_pointer<SPipTangents> pTangs;
-			pTex.data = (Vec2*)pRndMesh->GetUVPtr(pTex.iStride, FSL_READ);
-			pTangs.data = (SPipTangents*)pRndMesh->GetTangentPtr(pTangs.iStride, FSL_READ);
+			const auto pTex   = pRndMesh->GetTexCoords(FSL_READ);
+			const auto pTangs = pRndMesh->GetTangents(FSL_READ);
 
 			for (i = 0, center *= (1.0f / (nNewTris * 3)); i <= ivtxMax - ivtxMin; i++)
 			{
 				r = qmax(r, (pVtx[i + ivtxMin] - center).len2());
 
 				pMesh->m_pPositions[i] = pVtx[i + ivtxMin];
-				pMesh->m_pTexCoord[i] = SMeshTexCoord(pTex[i + ivtxMin]);
-				pMesh->m_pTangents[i] = SMeshTangents(pTangs[i + ivtxMin]);
-				pMesh->m_pNormals[i] = SMeshNormal(pMesh->m_pTangents[i].GetN());
+				pMesh->m_pTexCoord [i] = SMeshTexCoord(pTex[i + ivtxMin]);
+				pMesh->m_pTangents [i] = SMeshTangents(pTangs[i + ivtxMin]);
+				pMesh->m_pNormals  [i] = SMeshNormal  (pTangs[i + ivtxMin].GetN());
 			}
 
 			pIdxMesh->SetSubSetCount(1);

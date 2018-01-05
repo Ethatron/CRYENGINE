@@ -1275,9 +1275,6 @@ void CGeometryManager::Initialize(int nWorkers)
 bool CGeometryManager::ExtractDeformLOD(SMMRMGeometry* geometry, CStatObj* host, size_t nLod)
 {
 	MEMORY_SCOPE_CHECK_HEAP();
-	strided_pointer<Vec3> vtx;
-	strided_pointer<ColorB> colour;
-	vtx_idx* indices;
 	size_t constraints_alloc = 0, nconstraints = 0,
 	       nvertices = 0, nvertices_alloc = 0;
 	vtx_idx* mapping = 0;
@@ -1296,14 +1293,29 @@ bool CGeometryManager::ExtractDeformLOD(SMMRMGeometry* geometry, CStatObj* host,
 	for (size_t i = 0; i < geometry->numChunks[nLod]; ++i)
 	{
 		SMMRMChunk& chunk = geometry->pChunks[nLod][i];
-		vtx = strided_pointer<Vec3>(&chunk.general[0].xyz, sizeof(chunk.general[0]));
-		colour = strided_pointer<ColorB>(reinterpret_cast<ColorB*>(&chunk.general[0].color), sizeof(chunk.general[0]));
-		indices = chunk.indices;
+
+		strided_pointer<Vec3>    positions   = chunk.general   ? strided_pointer<Vec3   >(&chunk.general  [0].xyz  , sizeof(chunk.general  [0])) : 0;
+		strided_pointer<UCol>    colours     = chunk.general   ? strided_pointer<UCol   >(&chunk.general  [0].color, sizeof(chunk.general  [0])) : 0;
+		strided_pointer<Vec3f16> positions16 = chunk.general16 ? strided_pointer<Vec3f16>(&chunk.general16[0].xyz  , sizeof(chunk.general16[0])) : 0;
+		strided_pointer<UCol>    colours16   = chunk.general16 ? strided_pointer<UCol   >(&chunk.general16[0].color, sizeof(chunk.general16[0])) : 0;
+		vtx_idx* indices = chunk.indices;
+
 		for (size_t k = 0; k < chunk.nindices; k++)
 		{
-			const Vec3& pos = vtx[indices[k]];
-			const uint8 c[2] = { colour[indices[k]].g, colour[indices[k]].b };
-			const float m = (float)c[endian] / 255.f;
+			Vec3 pos;
+			uint8 c[2];
+
+			if (positions)
+				pos = positions  [indices[k]];
+			if (positions16)
+				pos = positions16[indices[k]].ToVec3();
+
+			if (colours)
+				c[0] = colours  [indices[k]].g, c[1] = colours  [indices[k]].b;
+			if (colours16)
+				c[0] = colours16[indices[k]].g, c[1] = colours16[indices[k]].b;
+
+			const float m = (float)c[endian] * (1.0f / 255.f);
 			size_t v_idx = (size_t)-1;
 			for (size_t n = 0; n < nvertices; ++n)
 			{
@@ -1316,12 +1328,14 @@ bool CGeometryManager::ExtractDeformLOD(SMMRMGeometry* geometry, CStatObj* host,
 					break;
 				}
 			}
+
 			if (v_idx == (size_t)-1)
 			{
 				v_idx = nvertices;
 				vertices[nvertices] = pos;
 				mass[nvertices++] = m;
 			}
+
 			mapping[indices[k]] = v_idx;
 		}
 	}
@@ -1330,7 +1344,9 @@ bool CGeometryManager::ExtractDeformLOD(SMMRMGeometry* geometry, CStatObj* host,
 	for (size_t i = 0; i < geometry->numChunks[nLod]; ++i)
 	{
 		SMMRMChunk& chunk = geometry->pChunks[nLod][i];
-		indices = chunk.indices;
+
+		vtx_idx* indices = chunk.indices;
+
 		// Extract bending constraints
 		for (size_t j = 0; j < chunk.nvertices; ++j)
 		{
@@ -1502,15 +1518,8 @@ bool CGeometryManager::PrepareLOD(SMMRMGeometry* geometry, CStatObj* host, size_
 {
 	MEMORY_SCOPE_CHECK_HEAP();
 	IRenderMesh* renderMesh = NULL;
-	strided_pointer<Vec2> uv;
-	strided_pointer<SPipTangents> tangs;
-	strided_pointer<Vec3> vtx;
-	strided_pointer<SPipNormal> norm;
-	strided_pointer<uint32> colour;
 	SPipQTangents* qtangents = NULL;
-	SMeshBoneMapping_uint8* weights;
 	bool weightsAllocated = false;
-	vtx_idx* indices;
 	CStatObj* statObj = (CStatObj*)host->GetLodObject(nLod, false);
 	if (!statObj)
 		return true;
@@ -1526,28 +1535,28 @@ bool CGeometryManager::PrepareLOD(SMMRMGeometry* geometry, CStatObj* host, size_
 	renderMesh->LockForThreadAccess();
 	int nvertices = renderMesh->GetVerticesCount();
 	InputLayoutHandle vtx_fmt = renderMesh->GetVertexFormat();
+	CRY_ASSERT(
+		vtx_fmt == EDefaultInputLayouts::P3F_C4B_T2F || vtx_fmt == EDefaultInputLayouts::P3H_C4B_T2H ||
+		vtx_fmt == EDefaultInputLayouts::P3F         || vtx_fmt == EDefaultInputLayouts::P3H
+	);
 
-	vtx.data = (Vec3*)renderMesh->GetPosPtr(vtx.iStride, FSL_READ);
-	colour.data = (uint32*)renderMesh->GetColorPtr(colour.iStride, FSL_READ);
-	uv.data = (Vec2*)renderMesh->GetUVPtr(uv.iStride, FSL_READ);
-	tangs.data = (SPipTangents*)renderMesh->GetTangentPtr(tangs.iStride, FSL_READ);
-	norm.data = (SPipNormal*)renderMesh->GetNormPtr(norm.iStride, FSL_READ);
-	indices = renderMesh->GetIndexPtr(FSL_READ);
-	weights = statObj->m_pBoneMapping;
+	const auto positions   = vtx_fmt == EDefaultInputLayouts::P3F_C4B_T2F || vtx_fmt == EDefaultInputLayouts::P3F ? renderMesh->GetPositions   (FSL_READ) : nullptr;
+	const auto colours     = vtx_fmt == EDefaultInputLayouts::P3F_C4B_T2F || vtx_fmt == EDefaultInputLayouts::P3F ? renderMesh->GetColors      (FSL_READ) : nullptr;
+	const auto texcoords   = vtx_fmt == EDefaultInputLayouts::P3F_C4B_T2F || vtx_fmt == EDefaultInputLayouts::P3F ? renderMesh->GetTexCoords   (FSL_READ) : nullptr;
+	const auto positions16 = vtx_fmt == EDefaultInputLayouts::P3H_C4B_T2H || vtx_fmt == EDefaultInputLayouts::P3H ? renderMesh->GetPositionsF16(FSL_READ) : nullptr;
+	const auto colours16   = vtx_fmt == EDefaultInputLayouts::P3H_C4B_T2H || vtx_fmt == EDefaultInputLayouts::P3H ? renderMesh->GetColors      (FSL_READ) : nullptr;
+	const auto texcoords16 = vtx_fmt == EDefaultInputLayouts::P3H_C4B_T2H || vtx_fmt == EDefaultInputLayouts::P3H ? renderMesh->GetTexCoordsF16(FSL_READ) : nullptr;
+	const auto tangents    = renderMesh->GetTangents(FSL_READ);
+	const auto normals     = Cry3DEngineBase::GetCVars()->e_MergedMeshesTesselationSupport ? renderMesh->GetNormals(FSL_READ) : 0;
 
-	if (Cry3DEngineBase::GetCVars()->e_MergedMeshesTesselationSupport == 0)
-	{
-		norm.data = NULL;
-		norm.iStride = 0;
-	}
-	else
-		norm.data = (SPipNormal*)renderMesh->GetNormPtr(norm.iStride, FSL_READ);
+	const auto indices = renderMesh->GetIndices(FSL_READ);
+	SMeshBoneMapping_uint8* weights = statObj->m_pBoneMapping;
 
-	if (tangs)
+	if (tangents)
 	{
 		resize_list(qtangents, renderMesh->GetVerticesCount(), 16);
 		MeshTangentsFrameToQTangents(
-		  tangs.data, tangs.iStride, nvertices,
+		  tangents.data, tangents.iStride, nvertices,
 		  qtangents, sizeof(qtangents[0]));
 	}
 
@@ -1571,7 +1580,7 @@ bool CGeometryManager::PrepareLOD(SMMRMGeometry* geometry, CStatObj* host, size_
 		if (!chunk)
 		{
 			resize_list(geometry->pChunks[nLod], (geometry->numChunks[nLod] + 1) * sizeof(SMMRMChunk), 16);
-			chunk = new(&geometry->pChunks[nLod][geometry->numChunks[nLod]++])SMMRMChunk(renderChunk.m_nMatID);
+			chunk = new(&geometry->pChunks[nLod][geometry->numChunks[nLod]++]) SMMRMChunk(renderChunk.m_nMatID);
 		}
 
 		chunk->nvertices_alloc += renderChunk.nNumVerts;
@@ -1587,14 +1596,21 @@ bool CGeometryManager::PrepareLOD(SMMRMGeometry* geometry, CStatObj* host, size_
 		weightsAllocated = true;
 		for (int i = 0; i < nvertices; ++i)
 		{
+			Vec3 position;
 			float dist = FLT_MAX;
 			size_t idx = (size_t)-1;
+
+			if (positions)
+				position = positions  [i];
+			if (positions16)
+				position = positions16[i].ToVec3();
+
 			for (int j = 0, boneIdx = 1; j < host->m_nSpines; boneIdx += host->m_pSpines[j++].nVtx - 1)
 			{
 				for (int k = 0; k < host->m_pSpines[j].nVtx - 1; ++k)
 				{
-					float t = 0.f, dp = Distance::Point_Lineseg(
-					  vtx[i], Lineseg(host->m_pSpines[j].pVtx[k], host->m_pSpines[j].pVtx[k + 1]), t);
+					float t = 0.f, dp = Distance::Point_Lineseg(position, Lineseg(host->m_pSpines[j].pVtx[k], host->m_pSpines[j].pVtx[k + 1]), t);
+					
 					if (dp < dist)
 					{
 						dist = dp;
@@ -1616,12 +1632,15 @@ bool CGeometryManager::PrepareLOD(SMMRMGeometry* geometry, CStatObj* host, size_
 	for (size_t i = 0; i < geometry->numChunks[nLod]; ++i)
 	{
 		SMMRMChunk* chunk = &geometry->pChunks[nLod][i];
-		resize_list(chunk->general, chunk->nvertices_alloc, 16);
 		resize_list(chunk->indices, chunk->nindices_alloc, 16);
 
+		if (positions)
+			resize_list(chunk->general, chunk->nvertices_alloc, 16);
+		if (positions16)
+			resize_list(chunk->general16, chunk->nvertices_alloc, 16);
 		if (qtangents)
 			resize_list(chunk->qtangents, chunk->nvertices_alloc, 16);
-		if (norm)
+		if (normals)
 			resize_list(chunk->normals, chunk->nvertices_alloc, 16);
 		if (weights)
 			resize_list(chunk->weights, chunk->nvertices_alloc, 16);
@@ -1648,19 +1667,22 @@ bool CGeometryManager::PrepareLOD(SMMRMGeometry* geometry, CStatObj* host, size_
 		for (size_t j = renderChunk.nFirstIndexId; j < renderChunk.nFirstIndexId + renderChunk.nNumIndices; ++j)
 		{
 			vtx_idx index = indices[j];
-			vtx_idx chkidx = (vtx_idx) - 1;
+			vtx_idx chkidx = (vtx_idx)-1;
 			SMMRMBoneMapping weightsForIndex;
 			if (weights)
 				weightsForIndex = weights[index];
 
 			for (size_t k = 0; k < chunk->nvertices; ++k)
 			{
-				IF (vtx[index] != chunk->general[k].xyz, 1) continue;
-				IF (colour && colour[index] != chunk->general[k].color.dcolor, 1) continue;
-				IF (uv && uv[index] != chunk->general[k].st, 1) continue;
-				IF (qtangents && qtangents[index] != chunk->qtangents[k], 1) continue;
-				IF (norm && norm[index] != chunk->normals[k], 1) continue;
-				IF (weights && chunk->weights[k] != weightsForIndex, 1) continue;
+				IF (positions   && positions  [index] != chunk->general  [k].xyz  , 1) continue;
+				IF (colours     && colours    [index] != chunk->general  [k].color, 1) continue;
+				IF (texcoords   && texcoords  [index] != chunk->general  [k].st   , 1) continue;
+				IF (positions16 && positions16[index] != chunk->general16[k].xyz  , 1) continue;
+				IF (colours16   && colours16  [index] != chunk->general16[k].color, 1) continue;
+				IF (texcoords16 && texcoords16[index] != chunk->general16[k].st   , 1) continue;
+				IF (qtangents   && qtangents  [index] != chunk->qtangents[k]      , 1) continue;
+				IF (normals     && normals    [index] != chunk->normals  [k]      , 1) continue;
+				IF (weights     && weightsForIndex    != chunk->weights  [k]      , 1) continue;
 
 				chkidx = (vtx_idx)k;
 				break;
@@ -1670,16 +1692,20 @@ bool CGeometryManager::PrepareLOD(SMMRMGeometry* geometry, CStatObj* host, size_
 			{
 				assert(chunk->nvertices < chunk->nvertices_alloc);
 				size_t usedSpines = 0;
-				chunk->general[chunk->nvertices].xyz = vtx[index];
 
-				if (colour) chunk->general[chunk->nvertices].color.dcolor = colour[index];
-				if (uv) chunk->general[chunk->nvertices].st = uv[index];
-				if (qtangents) chunk->qtangents[chunk->nvertices] = qtangents[index];
-				if (weights) chunk->weights[chunk->nvertices] = weightsForIndex;
-				if (norm) chunk->normals[chunk->nvertices] = norm[index];
+				if (positions  ) chunk->general  [chunk->nvertices].xyz   = positions  [index];
+				if (colours    ) chunk->general  [chunk->nvertices].color = colours    [index];
+				if (texcoords  ) chunk->general  [chunk->nvertices].st    = texcoords  [index];
+				if (positions16) chunk->general16[chunk->nvertices].xyz   = positions16[index];
+				if (colours16  ) chunk->general16[chunk->nvertices].color = colours16  [index];
+				if (texcoords16) chunk->general16[chunk->nvertices].st    = texcoords16[index];
+				if (qtangents  ) chunk->qtangents[chunk->nvertices]       = qtangents  [index];
+				if (normals    ) chunk->normals  [chunk->nvertices]       = normals    [index];
+				if (weights    ) chunk->weights  [chunk->nvertices]       = weightsForIndex;
 
 				for (size_t k = 0; weights && k < 4; ++k)
-					if (weights[index].weights[k]) ++usedSpines;
+					if (weights[index].weights[k])
+						++usedSpines;
 
 				geometry->maxSpinesPerVtx = max(geometry->maxSpinesPerVtx, usedSpines);
 				chkidx = (vtx_idx)(chunk->nvertices++);
@@ -1693,12 +1719,15 @@ bool CGeometryManager::PrepareLOD(SMMRMGeometry* geometry, CStatObj* host, size_
 	for (size_t i = 0; i < geometry->numChunks[nLod]; ++i)
 	{
 		SMMRMChunk* chunk = &geometry->pChunks[nLod][i];
-		resize_list(chunk->general, chunk->nvertices, 16);
 		resize_list(chunk->indices, chunk->nindices, 16);
 
+		if (positions)
+			resize_list(chunk->general, chunk->nvertices, 16);
+		if (positions16)
+			resize_list(chunk->general16, chunk->nvertices, 16);
 		if (qtangents)
 			resize_list(chunk->qtangents, chunk->nvertices, 16);
-		if (norm)
+		if (normals)
 			resize_list(chunk->normals, chunk->nvertices, 16);
 		if (weights)
 			resize_list(chunk->weights, chunk->nvertices, 16);
@@ -1708,21 +1737,31 @@ bool CGeometryManager::PrepareLOD(SMMRMGeometry* geometry, CStatObj* host, size_
 		{
 			memset(&chunk->skin_vertices[j], 0, sizeof(chunk->skin_vertices[j]));
 
-			chunk->skin_vertices[j].pos = chunk->general[j].xyz;
-			chunk->skin_vertices[j].uv = chunk->general[j].st;
-			chunk->skin_vertices[j].colour = chunk->general[j].color;
+			if (positions)
+			{
+				chunk->skin_vertices[j].pos    = chunk->general[j].xyz;
+				chunk->skin_vertices[j].colour = chunk->general[j].color;
+				chunk->skin_vertices[j].uv     = chunk->general[j].st;
+			}
+			
+			if (positions16)
+			{
+				chunk->skin_vertices[j].pos    = chunk->general16[j].xyz.ToVec3();
+				chunk->skin_vertices[j].colour = chunk->general16[j].color;
+				chunk->skin_vertices[j].uv     = chunk->general16[j].st.ToVec2();
+			}
 
 			if (chunk->normals)
 				chunk->skin_vertices[j].normal = chunk->normals[j];
+
+			if (chunk->qtangents)
+				chunk->skin_vertices[j].qt = chunk->qtangents[j];
 
 			if (chunk->weights)
 			{
 				chunk->skin_vertices[j].SetWeights(chunk->weights[j].weights);
 				chunk->skin_vertices[j].SetBoneIds(chunk->weights[j].boneIds);
 			}
-
-			if (chunk->qtangents)
-				chunk->skin_vertices[j].qt = chunk->qtangents[j];
 		}
 
 		if (nLod == 0)
@@ -2677,16 +2716,16 @@ done:
 			m_SizeInVRam += sizeof(vtx_idx) * ii;
 
 			strided_pointer<SPipTangents> tgtBuf;
-			strided_pointer<Vec3f16> vtxBuf;
+			strided_pointer<SVF_P3H_C4B_T2H> vtxBuf;
 			strided_pointer<SPipNormal> nrmBuf;
 			vtx_idx* idxBuf = NULL;
 
-			vtxBuf.data = (Vec3f16*)rm->GetPosPtrNoCache(vtxBuf.iStride, FSL_CREATE_MODE);
+			vtxBuf = rm->GetGeneralsF16(FSL_CREATE_MODE);
 			IF (mesh->hasNormals, 1)
-				nrmBuf.data = (SPipNormal*)rm->GetNormPtr(nrmBuf.iStride, FSL_CREATE_MODE);
+				nrmBuf = rm->GetNormals(FSL_CREATE_MODE);
 			IF (mesh->hasTangents, 1)
-				tgtBuf.data = (SPipTangents*)rm->GetTangentPtr(tgtBuf.iStride, FSL_CREATE_MODE);
-			idxBuf = rm->GetIndexPtr(FSL_CREATE_MODE);
+				tgtBuf = rm->GetTangents(FSL_CREATE_MODE);
+			idxBuf = rm->GetIndices(FSL_CREATE_MODE);
 
 			if (!rm->CanRender() || !vtxBuf || !idxBuf ||
 			    (mesh->hasNormals && !nrmBuf) ||
@@ -2702,9 +2741,9 @@ done:
 			for (size_t j = beg; j < k; ++j)
 			{
 				SMMRMUpdateContext* update = &mesh->updates[j];
-				update->general = (SVF_P3H_C4B_T2H*)vtxBuf.data;
-				update->tangents = tgtBuf.data;
-				update->normals = nrmBuf.data;
+				update->general = &vtxBuf[0];
+				update->tangents = &tgtBuf[0];
+				update->normals = &nrmBuf[0];
 				update->idxBuf = idxBuf;
 				update->updateFlag = rm->SetAsyncUpdateState();
 				update->colliders = m_Colliders;
@@ -2724,11 +2763,11 @@ done:
 #if MMRM_USE_BOUNDS_CHECK
 				for (size_t u = 0; u < update->chunks.size(); ++u)
 				{
-					if (((SVF_P3H_C4B_T2H*)vtxBuf.data) + update->chunks[u].voff > (((SVF_P3H_C4B_T2H*)vtxBuf.data) + iv)) __debugbreak();
-					if (idxBuf + update->chunks[u].ioff > idxBuf + ii) __debugbreak();
+					if (&vtxBuf[update->chunks[u].voff] > &vtxBuf[iv]) __debugbreak();
+					if (&idxBuf[update->chunks[u].ioff] > &idxBuf[ii]) __debugbreak();
 				}
-				update->general_end = ((SVF_P3H_C4B_T2H*)vtxBuf.data) + iv;
-				update->tangents_end = ((SPipTangents*)tgtBuf.data) + iv;
+				update->general_end = &vtxBuf[iv];
+				update->tangents_end = &tgtBuf[iv];
 				update->idx_end = idxBuf + ii;
 #endif
 #if MMRM_USE_JOB_SYSTEM
@@ -4942,8 +4981,8 @@ void CDeformableNode::UpdateInternalDeform(
 		// Create a new render mesh and dispatch the asynchronous updates
 		size_t indices = group->procGeom->numIdx, vertices = group->procGeom->numVtx;
 
-		update->general = (SVF_P3H_C4B_T2H*)vtxBuf.data;
-		update->tangents = (SPipTangents*)tgtBuf.data;
+		update->general = &vtxBuf[0];
+		update->tangents = &tgtBuf[0];
 		update->idxBuf = idxBuf;
 		update->updateFlag = rm->SetAsyncUpdateState();
 		update->colliders = m_Colliders;
@@ -4970,11 +5009,11 @@ void CDeformableNode::UpdateInternalDeform(
 #if MMRM_USE_BOUNDS_CHECK
 		for (size_t u = 0; u < update->chunks.size(); ++u)
 		{
-			if (((SVF_P3H_C4B_T2H*)vtxBuf.data) + update->chunks[u].voff >= (((SVF_P3H_C4B_T2H*)vtxBuf.data) + vertices)) __debugbreak();
-			if (((SVF_P3H_C4B_T2H*)vtxBuf.data) + update->chunks[u].voff + (update->chunks[u].vcnt - 1) >= (((SVF_P3H_C4B_T2H*)vtxBuf.data) + vertices)) __debugbreak();
+			if (&vtxBuf[update->chunks[u].voff                               ] >= &vtxBuf[vertices]) __debugbreak();
+			if (&vtxBuf[update->chunks[u].voff + (update->chunks[u].vcnt - 1)] >= &vtxBuf[vertices]) __debugbreak();
 		}
-		update->general_end = ((SVF_P3H_C4B_T2H*)vtxBuf.data) + vertices;
-		update->tangents_end = ((SPipTangents*)tgtBuf.data) + vertices;
+		update->general_end = &vtxBuf[vertices];
+		update->tangents_end = &tgtBuf[vertices];
 		update->idx_end = idxBuf + indices;
 #endif
 
@@ -5093,13 +5132,10 @@ void CDeformableNode::RenderInternalDeform(
 		  prtTriangleList, "MergedMesh", "MergedMesh", eRMT_Dynamic);
 
 		m_renderMesh->LockForThreadAccess();
-		strided_pointer<SPipTangents> tgtBuf;
-		strided_pointer<SVF_P3H_C4B_T2H> vtxBuf;
-		vtx_idx* idxBuf = NULL;
 
-		vtxBuf.data = (SVF_P3H_C4B_T2H*)m_renderMesh->GetPosPtrNoCache(vtxBuf.iStride, FSL_CREATE_MODE);
-		tgtBuf.data = (SPipTangents*)m_renderMesh->GetTangentPtr(tgtBuf.iStride, FSL_CREATE_MODE);
-		idxBuf = m_renderMesh->GetIndexPtr(FSL_CREATE_MODE);
+		auto vtxBuf = m_renderMesh->GetGeneralsF16(FSL_CREATE_MODE);
+		auto tgtBuf = m_renderMesh->GetTangents(FSL_CREATE_MODE);
+		auto idxBuf = m_renderMesh->GetIndices(FSL_CREATE_MODE);
 
 		if (!vtxBuf || !idxBuf || !tgtBuf)
 		{

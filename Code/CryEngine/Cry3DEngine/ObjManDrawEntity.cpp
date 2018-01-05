@@ -443,11 +443,10 @@ bool CObjManager::RayRenderMeshIntersection(IRenderMesh* pRenderMesh, const Vec3
 	MeshLock rmLock(pRenderMesh);
 
 	// get position offset and stride
-	int nPosStride = 0;
-	byte* pPos = pRenderMesh->GetPosPtr(nPosStride, FSL_READ);
+	const auto pPos = pRenderMesh->GetPositions(FSL_READ);
 
 	// get indices
-	vtx_idx* pInds = pRenderMesh->GetIndexPtr(FSL_READ);
+	const auto pInds = pRenderMesh->GetIndices(FSL_READ);
 	int nInds = pRenderMesh->GetIndicesCount();
 	assert(nInds % 3 == 0);
 
@@ -485,9 +484,9 @@ bool CObjManager::RayRenderMeshIntersection(IRenderMesh* pRenderMesh, const Vec3
 			assert((int)pInds[i + 2] < pRenderMesh->GetVerticesCount());
 
 			// get vertices
-			const Vec3 v0 = (*(Vec3*)&pPos[nPosStride * pInds[i + 0]]);
-			const Vec3 v1 = (*(Vec3*)&pPos[nPosStride * pInds[i + 1]]);
-			const Vec3 v2 = (*(Vec3*)&pPos[nPosStride * pInds[i + 2]]);
+			const Vec3 v0 = pPos[pInds[i + 0]];
+			const Vec3 v1 = pPos[pInds[i + 1]];
+			const Vec3 v2 = pPos[pInds[i + 2]];
 			/*
 			      if(b2DTest)
 			      {

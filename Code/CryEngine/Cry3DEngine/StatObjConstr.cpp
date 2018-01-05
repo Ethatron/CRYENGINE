@@ -33,6 +33,9 @@
 
 DEFINE_INTRUSIVE_LINKED_LIST(CStatObj)
 
+inline Vec3 toVec3(const Vec3& v)    { return v; }
+inline Vec3 toVec3(const Vec3f16& v) { return v.ToVec3(); }
+
 //////////////////////////////////////////////////////////////////////////
 CStatObj::CStatObj()
 {
@@ -655,36 +658,58 @@ bool CStatObj::IsPhysicsExist() const
 	return m_arrPhysGeomInfo.GetGeomCount() > 0;
 }
 
-bool CStatObj::IsSphereOverlap(const Sphere& sSphere)
+template<typename POSITION_STREAM>
+static bool IsSphereOverlap(CStatObj& pStatObj, strided_pointer<POSITION_STREAM> pPosition, const Sphere& sSphere)
 {
-	if (m_pRenderMesh && Overlap::Sphere_AABB(sSphere, m_AABB))
+	const auto pIndices = pStatObj.m_pRenderMesh->GetIndices(FSL_READ);
+	const int numIndices = pStatObj.m_pRenderMesh->GetIndicesCount();
+			
+	for (int i = 0; (i + 2) < numIndices; i += 3)
 	{
-		// if inside bbox
-		int nPosStride = 0;
-		int nInds = m_pRenderMesh->GetIndicesCount();
-		const byte* pPos = m_pRenderMesh->GetPosPtr(nPosStride, FSL_READ);
-		vtx_idx* pInds = m_pRenderMesh->GetIndexPtr(FSL_READ);
+		// test all triangles of water surface strip
+		const Vec3 v0 = toVec3(pPosition[pIndices[i + 0]]);
+		const Vec3 v1 = toVec3(pPosition[pIndices[i + 1]]);
+		const Vec3 v2 = toVec3(pPosition[pIndices[i + 2]]);
 
-		if (pInds && pPos)
-			for (int i = 0; (i + 2) < nInds; i += 3)
-			{
-				// test all triangles of water surface strip
-				Vec3 v0 = (*(Vec3*)&pPos[nPosStride * pInds[i + 0]]);
-				Vec3 v1 = (*(Vec3*)&pPos[nPosStride * pInds[i + 1]]);
-				Vec3 v2 = (*(Vec3*)&pPos[nPosStride * pInds[i + 2]]);
-				Vec3 vBoxMin = v0;
-				vBoxMin.CheckMin(v1);
-				vBoxMin.CheckMin(v2);
-				Vec3 vBoxMax = v0;
-				vBoxMax.CheckMax(v1);
-				vBoxMax.CheckMax(v2);
+		Vec3 vBoxMin = v0;
+		vBoxMin.CheckMin(v1);
+		vBoxMin.CheckMin(v2);
+		Vec3 vBoxMax = v0;
+		vBoxMax.CheckMax(v1);
+		vBoxMax.CheckMax(v2);
 
-				if (Overlap::Sphere_AABB(sSphere, AABB(vBoxMin, vBoxMax)))
-					return true;
-			}
+		if (Overlap::Sphere_AABB(sSphere, AABB(vBoxMin, vBoxMax)))
+			return true;
 	}
 
 	return false;
+}
+
+bool CStatObj::IsSphereOverlap(const Sphere& sSphere)
+{
+	bool overlaps = false;
+	if (m_pRenderMesh && Overlap::Sphere_AABB(sSphere, m_AABB))
+	{
+		// if inside bbox
+		int numIndices = m_pRenderMesh->GetIndicesCount();
+		int numVertices = m_pRenderMesh->GetVerticesCount();
+		if (numIndices && numVertices)
+		{
+			InputLayoutHandle vtx_fmt = m_pRenderMesh->GetVertexFormat();
+			
+			if (vtx_fmt == EDefaultInputLayouts::P3F_C4B_T2F || vtx_fmt == EDefaultInputLayouts::P3F)
+			{
+				overlaps = ::IsSphereOverlap(*this, m_pRenderMesh->GetPositions(FSL_READ), sSphere);
+			}
+
+			if (vtx_fmt == EDefaultInputLayouts::P3H_C4B_T2H || vtx_fmt == EDefaultInputLayouts::P3H)
+			{
+				overlaps = ::IsSphereOverlap(*this, m_pRenderMesh->GetPositionsF16(FSL_READ), sSphere);
+			}
+		}
+	}
+
+	return overlaps;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1471,6 +1496,39 @@ bool CStatObj::RayIntersection(SRayHitInfo& hitInfo, IMaterial* pCustomMtl)
 	return false;
 }
 
+template<typename POSITION_STREAM>
+static bool LineSegIntersection(CStatObj& pStatObj, strided_pointer<POSITION_STREAM> pPosition, const Lineseg& lineSeg, Vec3& hitPos, int& surfaceTypeId)
+{
+	const auto pIndices = pStatObj.m_pRenderMesh->GetIndices(FSL_READ);
+			
+	TRenderChunkArray& Chunks = pStatObj.m_pRenderMesh->GetChunks();
+	int nChunkCount = Chunks.size();
+	for (int nChunkId = 0; nChunkId < nChunkCount; nChunkId++)
+	{
+		CRenderChunk* pChunk = &Chunks[nChunkId];
+		if (!(pChunk->m_nMatFlags & MTL_FLAG_NODRAW))
+		{
+			int lastIndex = pChunk->nFirstIndexId + pChunk->nNumIndices;
+			for (int i = pChunk->nFirstIndexId; i < lastIndex; )
+			{
+				const Vec3 v0 = toVec3(pPosition[pIndices[i++]]);
+				const Vec3 v1 = toVec3(pPosition[pIndices[i++]]);
+				const Vec3 v2 = toVec3(pPosition[pIndices[i++]]);
+
+				if (Intersect::Lineseg_Triangle(lineSeg, v0, v2, v1, hitPos) || // Front face
+				    Intersect::Lineseg_Triangle(lineSeg, v0, v1, v2, hitPos))   // Back face
+				{
+					IMaterial* pMtl = pStatObj.m_pMaterial->GetSafeSubMtl(pChunk->m_nMatID);
+					surfaceTypeId = pMtl->GetSurfaceTypeId();
+					return true;
+				}
+			}
+		}
+	}
+
+	return false;
+}
+
 bool CStatObj::LineSegIntersection(const Lineseg& lineSeg, Vec3& hitPos, int& surfaceTypeId)
 {
 	bool intersects = false;
@@ -1481,35 +1539,18 @@ bool CStatObj::LineSegIntersection(const Lineseg& lineSeg, Vec3& hitPos, int& su
 		int numVertices = m_pRenderMesh->GetVerticesCount();
 		if (numIndices && numVertices)
 		{
-			int posStride;
-			uint8* pPositions = (uint8*)m_pRenderMesh->GetPosPtr(posStride, FSL_READ);
-			vtx_idx* pIndices = m_pRenderMesh->GetIndexPtr(FSL_READ);
-
-			TRenderChunkArray& Chunks = m_pRenderMesh->GetChunks();
-			int nChunkCount = Chunks.size();
-			for (int nChunkId = 0; nChunkId < nChunkCount; nChunkId++)
+			InputLayoutHandle vtx_fmt = m_pRenderMesh->GetVertexFormat();
+			
+			if (vtx_fmt == EDefaultInputLayouts::P3F_C4B_T2F || vtx_fmt == EDefaultInputLayouts::P3F)
 			{
-				CRenderChunk* pChunk = &Chunks[nChunkId];
-				if (!(pChunk->m_nMatFlags & MTL_FLAG_NODRAW))
-				{
-					int lastIndex = pChunk->nFirstIndexId + pChunk->nNumIndices;
-					for (int i = pChunk->nFirstIndexId; i < lastIndex; )
-					{
-						const Vec3& v0 = *(Vec3*)(pPositions + pIndices[i++] * posStride);
-						const Vec3& v1 = *(Vec3*)(pPositions + pIndices[i++] * posStride);
-						const Vec3& v2 = *(Vec3*)(pPositions + pIndices[i++] * posStride);
-
-						if (Intersect::Lineseg_Triangle(lineSeg, v0, v2, v1, hitPos) || // Front face
-						    Intersect::Lineseg_Triangle(lineSeg, v0, v1, v2, hitPos))   // Back face
-						{
-							IMaterial* pMtl = m_pMaterial->GetSafeSubMtl(pChunk->m_nMatID);
-							surfaceTypeId = pMtl->GetSurfaceTypeId();
-							intersects = true;
-							break;
-						}
-					}
-				}
+				intersects = ::LineSegIntersection(*this, m_pRenderMesh->GetPositions(FSL_READ), lineSeg, hitPos, surfaceTypeId);
 			}
+
+			if (vtx_fmt == EDefaultInputLayouts::P3H_C4B_T2H || vtx_fmt == EDefaultInputLayouts::P3H)
+			{
+				intersects = ::LineSegIntersection(*this, m_pRenderMesh->GetPositionsF16(FSL_READ), lineSeg, hitPos, surfaceTypeId);
+			}
+
 		}
 		m_pRenderMesh->UnlockStream(VSF_GENERAL);
 		m_pRenderMesh->UnlockIndexStream();

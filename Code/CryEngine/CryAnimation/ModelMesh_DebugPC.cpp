@@ -170,17 +170,15 @@ void CModelMesh::DrawWireframeStatic(const Matrix34& rRenderMat34, uint32 color)
 
 	m_pIRenderMesh->LockForThreadAccess();
 	uint32 numIndices = m_pIRenderMesh->GetIndicesCount();
-	vtx_idx* pIndices = m_pIRenderMesh->GetIndexPtr(FSL_READ);
-	int32 nPositionStride;
-	uint8* pPositions = m_pIRenderMesh->GetPosPtr(nPositionStride, FSL_READ);
+	const auto pIndices = m_pIRenderMesh->GetIndices(FSL_READ);
+	const auto pPositions = m_pIRenderMesh->GetPositions(FSL_READ);
 	if (pPositions == 0)
 		return;
 	++m_iThreadMeshAccessCounter;
 
 	for (uint32 e = 0; e < numExtVertices; e++)
 	{
-		Vec3 v = *(Vec3*)(pPositions + e * nPositionStride);
-		arrExtSkinnedStream[e] = rRenderMat34 * (v + m_vRenderMeshOffset);
+		arrExtSkinnedStream[e] = rRenderMat34 * (pPositions[e] + m_vRenderMeshOffset);
 	}
 
 	m_pIRenderMesh->UnLockForThreadAccess();

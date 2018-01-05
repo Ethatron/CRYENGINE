@@ -12,8 +12,6 @@ struct ISkin;
 
 class CAttachmentMerger : public IAttachmentMerger
 {
-	static const EDefaultInputLayouts::PreDefs TargetVertexFormat = EDefaultInputLayouts::P3F;
-
 public:
 
 	struct ShadowChunkRange
@@ -79,12 +77,9 @@ public:
 
 	struct MeshStreams
 	{
-		void*        pPositions;
-		void*        pSkinningInfos;
+		strided_pointer<byte> pPositions;
+		strided_pointer<SVF_W4B_I4U> pSkinningInfos;
 		vtx_idx*     pIndices;
-
-		int          nPositionStride;
-		int          nSkinningInfoStride;
 
 		IRenderMesh* pMesh;
 
@@ -146,7 +141,9 @@ private:
 
 	uint              CopyVertices(MeshStreams& dstStreams, uint dstVtxOffset, MeshStreams& srcStreams, uint numVertices);
 	uint              CopyVertices(MeshStreams& dstStreams, uint dstVtxOffset, MeshStreams& srcStreams, uint numVertices, const Matrix34& transform);
+	void              CopyIndices(MeshStreams& dstStreams, uint dstVtxOffset, uint dstIdxOffset, MeshStreams& srcStreams);
 	uint              CopyIndices(MeshStreams& dstStreams, uint dstVtxOffset, uint dstIdxOffset, MeshStreams& srcStreams, const CRenderChunk& chunk);
+	void              CopySkinning(MeshStreams& dstStreams, uint dstVtxOffset, MeshStreams& srcStreams, uint numVertices);
 	uint              CopySkinning(MeshStreams& dstStreams, uint dstVtxOffset, MeshStreams& srcStreams, uint numVertices, const DynArray<JointIdType>& boneIDs);
 	void              SkinToBone(MeshStreams& dstStreams, uint dstVtxOffset, MeshStreams& srcStreams, uint numVertices, JointIdType jointID);
 

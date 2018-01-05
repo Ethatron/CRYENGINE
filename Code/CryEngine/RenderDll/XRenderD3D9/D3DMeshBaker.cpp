@@ -51,7 +51,6 @@ public:
 	virtual void               mfGetPlane(Plane& pl)                                                                   { m_pSrc->mfGetPlane(pl); }
 	virtual bool               mfCompile(CParserBin& Parser, SParserFrame& Frame)                                      { return m_pSrc->mfCompile(Parser, Frame); }
 	virtual bool               mfDraw(CShader* ef, SShaderPass* sfm);
-	virtual void*              mfGetPointer(ESrcPointer ePT, int* Stride, EParamType Type, ESrcPointer Dst, int Flags) { return m_pSrc->mfGetPointer(ePT, Stride, Type, Dst, Flags); }
 	virtual bool               mfPreDraw(SShaderPass* sl)                                                              { return m_pSrc->mfPreDraw(sl); }
 	virtual bool               mfUpdate(InputLayoutHandle eVertFormat, int Flags, bool bTessellation = false)          { bool bRet = m_pSrc->mfUpdate(eVertFormat, Flags, bTessellation); gcpRendD3D->m_RP.m_CurVFormat = EDefaultInputLayouts::P3F_T2F_T3F; return bRet; }
 	virtual void               mfPrecache(const SShaderItem& SH)                                                       { m_pSrc->mfPrecache(SH); }

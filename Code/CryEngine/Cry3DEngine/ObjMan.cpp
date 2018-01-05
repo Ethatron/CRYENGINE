@@ -1025,11 +1025,10 @@ bool CObjManager::SphereRenderMeshIntersection(IRenderMesh* pRenderMesh, const V
 	FUNCTION_PROFILER_3DENGINE;
 
 	// get position offset and stride
-	int nPosStride = 0;
-	byte* pPos = pRenderMesh->GetPosPtr(nPosStride, FSL_READ);
+	const auto pPos = pRenderMesh->GetPositions(FSL_READ);
 
 	// get indices
-	vtx_idx* pInds = pRenderMesh->GetIndexPtr(FSL_READ);
+	const auto pInds = pRenderMesh->GetIndices(FSL_READ);
 	int nInds = pRenderMesh->GetIndicesCount();
 	assert(nInds % 3 == 0);
 
@@ -1057,9 +1056,9 @@ bool CObjManager::SphereRenderMeshIntersection(IRenderMesh* pRenderMesh, const V
 			assert((int)pInds[i + 2] < pRenderMesh->GetVerticesCount());
 
 			// get triangle vertices
-			Vec3 v0 = (*(Vec3*)&pPos[nPosStride * pInds[i + 0]]);
-			Vec3 v1 = (*(Vec3*)&pPos[nPosStride * pInds[i + 1]]);
-			Vec3 v2 = (*(Vec3*)&pPos[nPosStride * pInds[i + 2]]);
+			const Vec3 v0 = pPos[pInds[i + 0]];
+			const Vec3 v1 = pPos[pInds[i + 1]];
+			const Vec3 v2 = pPos[pInds[i + 2]];
 
 			AABB triBox;
 			triBox.min = v0;

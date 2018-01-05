@@ -66,16 +66,10 @@ uint32 CModelMesh::IsVBufferValid()
 	m_pIRenderMesh->LockForThreadAccess();
 	uint32 numIndices = m_pIRenderMesh->GetIndicesCount();
 	uint32 numVertices = m_pIRenderMesh->GetVerticesCount();
-	vtx_idx* pIndices = m_pIRenderMesh->GetIndexPtr(FSL_READ);
-	if (pIndices == 0)
-		return 0;
-	int32 nPositionStride;
-	uint8* pPositions = m_pIRenderMesh->GetPosPtr(nPositionStride, FSL_READ);
-	if (pPositions == 0)
-		return 0;
-	int32 nSkinningStride;
-	uint8* pSkinningInfo = m_pIRenderMesh->GetHWSkinPtr(nSkinningStride, FSL_READ);        //pointer to weights and bone-id
-	if (pSkinningInfo == 0)
+	const auto pIndices = m_pIRenderMesh->GetIndices(FSL_READ);
+	const auto pPositions = m_pIRenderMesh->GetPositions(FSL_READ);
+	const auto pSkinningInfo = m_pIRenderMesh->GetHWSkinWeights(FSL_READ);        //pointer to weights and bone-id
+	if (pIndices == 0 || pPositions == 0 || pSkinningInfo == 0)
 		return 0;
 	++m_iThreadMeshAccessCounter;
 
@@ -102,28 +96,25 @@ ClosestTri CModelMesh::GetAttachmentTriangle(const Vec3& RMWPosition, const Join
 	if (m_pIRenderMesh == 0)
 		return cf;
 	m_pIRenderMesh->LockForThreadAccess();
+
 	uint32 numIndices = m_pIRenderMesh->GetIndicesCount();
 	uint32 numVertices = m_pIRenderMesh->GetVerticesCount();
-	vtx_idx* pIndices = m_pIRenderMesh->GetIndexPtr(FSL_READ);
-	if (pIndices == 0)
+	const auto pIndices = m_pIRenderMesh->GetIndices(FSL_READ);
+	const auto pPositions = m_pIRenderMesh->GetPositions(FSL_READ);
+	const auto pSkinningInfo = m_pIRenderMesh->GetHWSkinWeights(FSL_READ, false);          //pointer to weights and bone-id
+
+	if (pIndices == 0 || pPositions == 0 || pSkinningInfo == 0)
 		return cf;
-	int32 nPositionStride;
-	uint8* pPositions = m_pIRenderMesh->GetPosPtr(nPositionStride, FSL_READ);
-	if (pPositions == 0)
-		return cf;
-	int32 nSkinningStride;
-	uint8* pSkinningInfo = m_pIRenderMesh->GetHWSkinPtr(nSkinningStride, FSL_READ, 0, false);          //pointer to weights and bone-id
-	if (pSkinningInfo == 0)
-		return cf;
+
 	++m_iThreadMeshAccessCounter;
 
 	f32 distance = 99999999.0f;
 	uint32 foundPos(~0);
 	for (uint32 d = 0; d < numIndices; d += 3)
 	{
-		Vec3 v0 = *(Vec3*)(pPositions + pIndices[d + 0] * nPositionStride);
-		Vec3 v1 = *(Vec3*)(pPositions + pIndices[d + 1] * nPositionStride);
-		Vec3 v2 = *(Vec3*)(pPositions + pIndices[d + 2] * nPositionStride);
+		Vec3 v0 = pPositions[pIndices[d + 0]];
+		Vec3 v1 = pPositions[pIndices[d + 1]];
+		Vec3 v2 = pPositions[pIndices[d + 2]];
 		Vec3 TriMiddle = (v0 + v1 + v2) / 3.0f + m_vRenderMeshOffset;
 		f32 sqdist = (TriMiddle - RMWPosition) | (TriMiddle - RMWPosition);
 		if (distance > sqdist)
@@ -133,14 +124,15 @@ ClosestTri CModelMesh::GetAttachmentTriangle(const Vec3& RMWPosition, const Join
 	for (uint32 t = 0; t < 3; t++)
 	{
 		uint32 e = pIndices[foundPos + t];
-		Vec3 hwPosition = *(Vec3*)(pPositions + e * nPositionStride);
-		uint16* hwBoneIDs = ((SVF_W4B_I4U*)(pSkinningInfo + e * nSkinningStride))->indices;
-		ColorB hwWeights = *(ColorB*)&((SVF_W4B_I4U*)(pSkinningInfo + e * nSkinningStride))->weights;
+		Vec3 hwPosition = pPositions[e];
+		const uint16* hwBoneIDs = pSkinningInfo[e].indices;
+		UCol hwWeights = pSkinningInfo[e].weights;
+
 		cf.v[t].m_attTriPos = hwPosition + m_vRenderMeshOffset;
-		cf.v[t].m_attWeights[0] = hwWeights[0] / 255.0f;
-		cf.v[t].m_attWeights[1] = hwWeights[1] / 255.0f;
-		cf.v[t].m_attWeights[2] = hwWeights[2] / 255.0f;
-		cf.v[t].m_attWeights[3] = hwWeights[3] / 255.0f;
+		cf.v[t].m_attWeights[0] = hwWeights.bcolor[0] * (1.0f / 255.0f);
+		cf.v[t].m_attWeights[1] = hwWeights.bcolor[1] * (1.0f / 255.0f);
+		cf.v[t].m_attWeights[2] = hwWeights.bcolor[2] * (1.0f / 255.0f);
+		cf.v[t].m_attWeights[3] = hwWeights.bcolor[3] * (1.0f / 255.0f);
 		if (pRemapTable)
 		{
 			cf.v[t].m_attJointIDs[0] = pRemapTable[hwBoneIDs[0]];
